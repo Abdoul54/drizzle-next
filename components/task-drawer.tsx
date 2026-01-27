@@ -41,7 +41,7 @@ import {
 } from "./ui/drawer";
 import { Button } from "./ui/button";
 import { Task } from "@/types/task";
-import { createTask, updateTask } from "@/actions/task";
+import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
 import { useEffect, useState } from "react";
 
 const schema = z.object({
@@ -55,10 +55,11 @@ const schema = z.object({
 
 const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Task }) => {
 
-    const isEditting = Boolean(data);
-
+    const isEditing = Boolean(data);
     const [open, setOpen] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const createTask = useCreateTask();
+    const updateTask = useUpdateTask();
 
     const form = useForm<z.infer<typeof schema>>({
         resolver: zodResolver(schema),
@@ -71,7 +72,7 @@ const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Tas
     });
 
     useEffect(() => {
-        if (isEditting && data) {
+        if (isEditing && data) {
             form.reset({
                 title: data.title,
                 description: data.description || "",
@@ -79,34 +80,31 @@ const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Tas
                 status: data.status || "todo",
             });
         }
-    }, [isEditting, data, form]);
+    }, [isEditing, data, form]);
 
     const onSubmit = async (formData: z.infer<typeof schema>) => {
-        if (isSubmitting) return;
+        const taskData = {
+            ...formData,
+            description: formData.description ?? null,
+        };
 
-        setIsSubmitting(true);
-
-        if (isEditting && data?.id) {
-            await updateTask(data.id, {
-                ...formData,
-                description: formData.description ?? null,
-            });
+        if (isEditing && data?.id) {
+            updateTask.mutate(
+                { id: data.id, ...taskData },
+                { onSuccess: () => { form.reset(); setOpen(false); } }
+            );
         } else {
-            await createTask({
-                ...formData,
-                description: formData.description ?? null,
+            createTask.mutate(taskData, {
+                onSuccess: () => { form.reset(); setOpen(false); }
             });
         }
-
-        form.reset();
-        setIsSubmitting(false);
-        setOpen(false); // ✅ THIS IS THE FIX
     };
 
+    const isPending = createTask.isPending || updateTask.isPending;
 
 
     const renderTrigger = () => {
-        if (isEditting) {
+        if (isEditing) {
             return variant === "icon" ? (
                 <Button size="icon-sm" variant="outline">
                     <PenSquare />
@@ -126,7 +124,7 @@ const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Tas
     };
 
     const renderHeader = () => {
-        if (isEditting) {
+        if (isEditing) {
             return (
                 <>
                     <DrawerTitle>Edit Task</DrawerTitle>

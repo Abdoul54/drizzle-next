@@ -1,27 +1,24 @@
+// components/task.tsx
 "use client";
 
 import { Check, Clock, Circle, Trash, Play } from "lucide-react";
 import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
-import {
-    Item,
-    ItemActions,
-    ItemContent,
-    ItemDescription,
-    ItemMedia,
-    ItemTitle,
-} from "./ui/item";
+import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./ui/item";
 import { Task as TaskType } from "@/types/task";
-import { changeTaskStatus, deleteTask } from "@/actions/task";
+import { useDeleteTask, useUpdateTask } from "@/hooks/use-tasks";
 import TaskDrawer from "./task-drawer";
 
 const STATUS_MAP = {
-    todo: { bgcolor: "bg-info/20", color: "text-info", label: "To Do", icon: Circle },
-    in_progress: { bgcolor: "bg-warning/20", color: "text-warning", label: "In Progress", icon: Clock },
-    done: { bgcolor: "bg-success/20", color: "text-success", label: "Done", icon: Check },
+    todo: { bgcolor: "bg-info/20", color: "text-info", icon: Circle },
+    in_progress: { bgcolor: "bg-warning/20", color: "text-warning", icon: Clock },
+    done: { bgcolor: "bg-success/20", color: "text-success", icon: Check },
 } as const;
 
-const Task = ({ task }: { task: TaskType }) => {
+export default function Task({ task }: { task: TaskType }) {
+    const updateTask = useUpdateTask();
+    const deleteTask = useDeleteTask();
+
     const status = STATUS_MAP[task.status ?? "todo"];
     const Icon = status.icon;
 
@@ -45,7 +42,8 @@ const Task = ({ task }: { task: TaskType }) => {
                     <Button
                         size="icon-sm"
                         variant="outline"
-                        onClick={() => changeTaskStatus(task.id, "in_progress")}
+                        disabled={updateTask.isPending}
+                        onClick={() => updateTask.mutate({ id: task.id, status: "in_progress" })}
                     >
                         <Play />
                     </Button>
@@ -55,7 +53,8 @@ const Task = ({ task }: { task: TaskType }) => {
                     <Button
                         size="icon-sm"
                         variant="outline-success"
-                        onClick={() => changeTaskStatus(task.id, "done")}
+                        disabled={updateTask.isPending}
+                        onClick={() => updateTask.mutate({ id: task.id, status: "done" })}
                     >
                         <Check />
                     </Button>
@@ -66,14 +65,12 @@ const Task = ({ task }: { task: TaskType }) => {
                 <Button
                     size="icon-sm"
                     variant="outline-destructive"
-                    onClick={() => deleteTask(task.id)}
+                    disabled={deleteTask.isPending}
+                    onClick={() => deleteTask.mutate(task.id)}
                 >
                     <Trash />
                 </Button>
-
             </ItemActions>
         </Item>
     );
-};
-
-export default Task;
+}
