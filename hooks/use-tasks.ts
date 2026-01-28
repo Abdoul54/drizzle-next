@@ -9,8 +9,15 @@ export function useTasks() {
         queryKey: ["tasks"],
         queryFn: async () => {
             const res = await fetch("/api/tasks");
+
+            if (res.status === 401) throw new Error("Unauthorized");
             if (!res.ok) throw new Error("Failed to fetch tasks");
+
             return res.json();
+        },
+        retry: (failureCount, error) => {
+            if (error.message === "Unauthorized") return false;
+            return failureCount < 3;
         },
     });
 }
@@ -19,17 +26,19 @@ export function useCreateTask() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (task: Omit<Task, "id" | "createdAt" | "updatedAt">) => {
+        mutationFn: async (task: Omit<Task, "id" | "createdAt" | "userId">) => {
             const res = await fetch("/api/tasks", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(task),
             });
+
+            if (res.status === 401) throw new Error("Unauthorized");
             if (!res.ok) throw new Error("Failed to create task");
+
             return res.json();
         },
 
-        // Optimistic update
         onMutate: async (newTask) => {
             await queryClient.cancelQueries({ queryKey: ["tasks"] });
 
@@ -38,9 +47,9 @@ export function useCreateTask() {
             queryClient.setQueryData<Task[]>(["tasks"], (old) => [
                 {
                     ...newTask,
-                    id: Date.now(), // temp id
+                    id: crypto.randomUUID(),  // string, not number
+                    userId: "",  // placeholder, will be replaced on settle
                     createdAt: new Date(),
-                    updatedAt: new Date(),
                 } as Task,
                 ...(old || []),
             ]);
@@ -62,13 +71,17 @@ export function useUpdateTask() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async ({ id, ...data }: Partial<Task> & { id: number }) => {
+        mutationFn: async ({ id, ...data }: Partial<Task> & { id: string }) => {  // string
             const res = await fetch(`/api/tasks/${id}`, {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(data),
             });
+
+            if (res.status === 401) throw new Error("Unauthorized");
+            if (res.status === 404) throw new Error("Task not found");
             if (!res.ok) throw new Error("Failed to update task");
+
             return res.json();
         },
 
@@ -98,9 +111,13 @@ export function useDeleteTask() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: async (id: number) => {
+        mutationFn: async (id: string) => {  // string
             const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+
+            if (res.status === 401) throw new Error("Unauthorized");
+            if (res.status === 404) throw new Error("Task not found");
             if (!res.ok) throw new Error("Failed to delete task");
+
             return res.json();
         },
 
