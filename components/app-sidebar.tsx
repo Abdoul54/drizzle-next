@@ -1,3 +1,5 @@
+'use client'
+
 import * as React from "react"
 
 import {
@@ -12,17 +14,13 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { GraduationCap } from "lucide-react"
+import { useConversations } from "@/hooks/use-conversations"
 
 
-const conversations = [
-    {
-        id: 1,
-        title: 'ghfdhgfh',
-        url: 'hghgvhgvh'
-    }
-]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+    const { data: conversations } = useConversations()
+
     return (
         <Sidebar {...props}>
             <SidebarHeader>
@@ -32,10 +30,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroup>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {conversations.map((conv) => (
-                                <SidebarMenuItem key={conv.title}>
+                            {conversations?.map((conv) => (
+                                <SidebarMenuItem key={conv.id}>
                                     <SidebarMenuButton asChild>
-                                        <a href={conv.url}>
+                                        <a href={`/quiz/${conv.quizId}`}>
                                             <span>{conv.title}</span>
                                         </a>
                                     </SidebarMenuButton>

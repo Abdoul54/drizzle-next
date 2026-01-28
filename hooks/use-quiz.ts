@@ -8,6 +8,20 @@ export type Quiz = {
     types: string[];
 };
 
+export type Conversation = {
+    id: string;
+    title: string | null;
+    userId: string;
+    quizId: string;
+    createdAt: Date;
+    updatedAt: Date;
+};
+
+export type CreateQuizResponse = {
+    quiz: Quiz;
+    conversation: Conversation;
+};
+
 type CreateQuizInput = Omit<Quiz, "id">;
 
 const fetchQuizzes = async (): Promise<Quiz[]> => {
@@ -22,12 +36,13 @@ const fetchQuiz = async (id: string): Promise<Quiz> => {
     return res.json();
 };
 
-const createQuiz = async (data: CreateQuizInput): Promise<Quiz> => {
+const createQuiz = async (data: CreateQuizInput): Promise<CreateQuizResponse> => {
     const res = await fetch("/api/quizzes", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
     });
+    if (res.status === 401) throw new Error("Unauthorized");
     if (!res.ok) throw new Error("Failed to create quiz");
     return res.json();
 };
@@ -59,8 +74,10 @@ export const useCreateQuiz = () => {
 
     return useMutation({
         mutationFn: createQuiz,
-        onSuccess: () => {
+        onSuccess: (data) => {
             queryClient.invalidateQueries({ queryKey: ["quizzes"] });
+            // Also invalidate conversations if you have a conversations query
+            queryClient.invalidateQueries({ queryKey: ["conversations"] });
         },
     });
 };
@@ -72,6 +89,7 @@ export const useDeleteQuiz = () => {
         mutationFn: deleteQuiz,
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["quizzes"] });
+            queryClient.invalidateQueries({ queryKey: ["conversations"] });
         },
     });
 };
