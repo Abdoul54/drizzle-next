@@ -1,15 +1,6 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb } from "drizzle-orm/pg-core";
 
-
-// Define enums for priority and status
-
-export const priorities = ['low', 'medium', 'high'] as const;
-export const statuses = ['todo', 'in_progress', 'done'] as const;
-
-// Define enum separately
-export const priorityEnum = pgEnum('priority', priorities);
-export const statusEnum = pgEnum('status', statuses);
 
 export const user = pgTable("user", {
     id: text("id").primaryKey(),
@@ -103,22 +94,21 @@ export const accountRelations = relations(account, ({ one }) => ({
 }));
 
 
-/* TASKS */
-export const tasks = pgTable("tasks", {
-    id: text("id").primaryKey(),
-    title: text("title").notNull(),
-    description: text("description"),
-    priority: priorityEnum('priority').notNull().default('low'),
-    status: statusEnum('status').notNull().default('todo'),
-    userId: text("user_id")
-        .notNull()
-        .references(() => user.id, { onDelete: "cascade" }),
-    createdAt: timestamp("created_at").defaultNow(),
-});
 
+// REST
 
-// db/schema.ts
+export const quizzes = pgTable(
+    "quizzes",
+    {
+        id: text("id").primaryKey(),
+        title: text("title").notNull(),
+        description: text("description").notNull(),
+        category: text("category").notNull(),
+        types: jsonb("types").notNull()
+    }
+)
 
+// Update conversations table - add quizId
 export const conversations = pgTable(
     "conversations",
     {
@@ -127,14 +117,38 @@ export const conversations = pgTable(
         userId: text("user_id")
             .notNull()
             .references(() => user.id, { onDelete: "cascade" }),
+        quizId: text("quiz_id")
+            .notNull()
+            .references(() => quizzes.id, { onDelete: "cascade" })
+            .unique(), // unique enforces one-to-one
         createdAt: timestamp("created_at").defaultNow().notNull(),
         updatedAt: timestamp("updated_at")
             .defaultNow()
             .$onUpdate(() => new Date())
             .notNull(),
     },
-    (table) => [index("conversation_user_idx").on(table.userId)]
+    (table) => [
+        index("conversation_user_idx").on(table.userId),
+        index("conversation_quiz_idx").on(table.quizId),
+    ]
 );
+
+// Add relations
+export const conversationRelations = relations(conversations, ({ one, many }) => ({
+    user: one(user, {
+        fields: [conversations.userId],
+        references: [user.id],
+    }),
+    quiz: one(quizzes, {
+        fields: [conversations.quizId],
+        references: [quizzes.id],
+    }),
+    messages: many(messages),
+}));
+
+export const quizRelations = relations(quizzes, ({ one }) => ({
+    conversation: one(conversations),
+}));
 
 export const messages = pgTable(
     "messages",
@@ -156,3 +170,5 @@ export const messageRelations = relations(messages, ({ one }) => ({
         references: [conversations.id],
     }),
 }));
+
+

@@ -1,6 +1,5 @@
 "use client";
 
-import { priorities, statuses } from "@/db/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm, Controller } from "react-hook-form";
 import * as z from "zod";
@@ -47,8 +46,6 @@ import { useEffect, useState } from "react";
 const schema = z.object({
     title: z.string().min(1, "Title is required"),
     description: z.string().optional(),
-    priority: z.enum(priorities),
-    status: z.enum(statuses),
 });
 
 
@@ -66,8 +63,6 @@ const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Tas
         defaultValues: {
             title: "",
             description: "",
-            priority: "low",
-            status: "todo",
         },
     });
 
@@ -76,8 +71,6 @@ const TaskDrawer = ({ variant, data }: { variant?: 'button' | 'icon'; data?: Tas
             form.reset({
                 title: data.title,
                 description: data.description || "",
-                priority: data.priority || "low",
-                status: data.status || "todo",
             });
         }
     }, [isEditing, data, form]);

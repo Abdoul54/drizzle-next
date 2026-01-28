@@ -11,6 +11,7 @@ import {
     SidebarMenuItem,
     SidebarRail,
 } from "@/components/ui/sidebar"
+import { GraduationCap } from "lucide-react"
 
 
 const conversations = [
@@ -20,11 +21,12 @@ const conversations = [
         url: 'hghgvhgvh'
     }
 ]
+
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     return (
         <Sidebar {...props}>
             <SidebarHeader>
-                <span className="text-center font-bold text-xl py-1">Chats</span>
+                <div className="flex justify-center items-center gap-2 font-bold text-xl py-1"><GraduationCap />Quizzes</div>
             </SidebarHeader>
             <SidebarContent>
                 <SidebarGroup>
