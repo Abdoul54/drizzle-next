@@ -40,7 +40,7 @@ import {
 } from "./ui/drawer";
 import { Button } from "./ui/button";
 import { Task } from "@/types/task";
-import { useCreateTask, useUpdateTask } from "@/hooks/use-tasks";
+import { useCreateTask, useUpdateTask } from "@/hooks/queries/use-tasks";
 import { useEffect, useState } from "react";
 
 const schema = z.object({

@@ -133,6 +133,20 @@ export const conversations = pgTable(
     ]
 );
 
+export const messages = pgTable(
+    "messages",
+    {
+        id: text("id").primaryKey(),
+        conversationId: text("conversation_id")
+            .notNull()
+            .references(() => conversations.id, { onDelete: "cascade" }),
+        role: text("role").notNull(), // 'user' | 'assistant'
+        content: text("content").notNull(),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [index("message_conversation_idx").on(table.conversationId)]
+);
+
 // Add relations
 export const conversationRelations = relations(conversations, ({ one, many }) => ({
     user: one(user, {
@@ -150,19 +164,6 @@ export const quizRelations = relations(quizzes, ({ one }) => ({
     conversation: one(conversations),
 }));
 
-export const messages = pgTable(
-    "messages",
-    {
-        id: text("id").primaryKey(),
-        conversationId: text("conversation_id")
-            .notNull()
-            .references(() => conversations.id, { onDelete: "cascade" }),
-        role: text("role").notNull(), // 'user' | 'assistant'
-        content: text("content").notNull(),
-        createdAt: timestamp("created_at").defaultNow().notNull(),
-    },
-    (table) => [index("message_conversation_idx").on(table.conversationId)]
-);
 
 export const messageRelations = relations(messages, ({ one }) => ({
     conversation: one(conversations, {

@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from "./ui/avatar";
 import { Button } from "./ui/button";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemMedia, ItemTitle } from "./ui/item";
 import { Task as TaskType } from "@/types/task";
-import { useDeleteTask, useUpdateTask } from "@/hooks/use-tasks";
+import { useDeleteTask, useUpdateTask } from "@/hooks/queries/use-tasks";
 import TaskDrawer from "./task-drawer";
 
 const STATUS_MAP = {
