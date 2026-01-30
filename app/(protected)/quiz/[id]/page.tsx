@@ -2,7 +2,7 @@
 
 import { Attachment, AttachmentPreview, AttachmentRemove, Attachments } from '@/components/ai-elements/attachments';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
-import { Message, MessageAction, MessageActions, MessageContent, MessageResponse } from '@/components/ai-elements/message';
+import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import { PromptInput, PromptInputActionAddAttachments, PromptInputActionMenu, PromptInputActionMenuContent, PromptInputActionMenuTrigger, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputHeader, PromptInputMessage, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments } from '@/components/ai-elements/prompt-input';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Shimmer } from '@/components/ai-elements/shimmer';
@@ -11,7 +11,7 @@ import ChatSkeleton from '@/components/chat-skeleton';
 import { useConversationByQuizId } from '@/hooks/queries/use-conversations';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
-import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
+import { GlobeIcon } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -49,7 +49,7 @@ export default function Page() {
     const conversationId = conversation?.id;
     const initialMessages = conversation?.messages ?? [];
 
-    const { messages, sendMessage, status, regenerate } = useChat({
+    const { messages, sendMessage, status } = useChat({
         id: conversationId, // Use conversationId as chat id
         transport: new DefaultChatTransport({
             api: '/api/chat',
@@ -117,22 +117,6 @@ Generate a set of questions following these constraints.`;
                                                                     {part.text}
                                                                 </MessageResponse>
                                                             </MessageContent>
-                                                            {message.role === 'assistant' && status !== 'streaming' && messageIndex === messages.length - 1 && (
-                                                                <MessageActions>
-                                                                    <MessageAction
-                                                                        onClick={() => regenerate()}
-                                                                        label="Retry"
-                                                                    >
-                                                                        <RefreshCcwIcon className="size-3" />
-                                                                    </MessageAction>
-                                                                    <MessageAction
-                                                                        onClick={() => navigator.clipboard.writeText(part.text)}
-                                                                        label="Copy"
-                                                                    >
-                                                                        <CopyIcon className="size-3" />
-                                                                    </MessageAction>
-                                                                </MessageActions>
-                                                            )}
                                                         </Message>
                                                     );
                                                 case 'reasoning':
