@@ -1,13 +1,12 @@
-// app/api/conversations/quiz/[quizId]/route.ts
 import { db } from "@/db";
-import { conversations, messages } from "@/db/schema";
+import { conversations, messages, quizzes } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth-session";
 import { eq, and, asc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 export async function GET(
     request: Request,
-    { params }: { params: Promise<{ quizId: string }> }
+    { params }: { params: { quizId: string } }
 ) {
     const user = await getCurrentUser();
 
@@ -17,24 +16,34 @@ export async function GET(
 
     const { quizId } = await params;
 
-    const conversation = await db
-        .select()
+    const [conversation] = await db
+        .select({
+            conversation: conversations,
+            quiz: quizzes,
+        })
         .from(conversations)
-        .where(and(eq(conversations.quizId, quizId), eq(conversations.userId, user.id)))
+        .innerJoin(quizzes, eq(conversations.quizId, quizzes.id))
+        .where(
+            and(
+                eq(conversations.quizId, quizId),
+                eq(conversations.userId, user.id)
+            )
+        )
         .limit(1);
 
-    if (!conversation.length) {
+    if (!conversation) {
         return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
     }
 
     const conversationMessages = await db
         .select()
         .from(messages)
-        .where(eq(messages.conversationId, conversation[0].id))
+        .where(eq(messages.conversationId, conversation.conversation.id))
         .orderBy(asc(messages.createdAt));
 
     return NextResponse.json({
-        ...conversation[0],
+        ...conversation.conversation,
+        quiz: conversation.quiz,
         messages: conversationMessages,
     });
 }

@@ -2,6 +2,8 @@
 // AUTH
 // =====================
 
+import { UIDataTypes, UIMessagePart, UITools } from "ai";
+
 export interface User {
     id: string;
     name: string;
@@ -77,13 +79,21 @@ export interface Conversation {
 // MESSAGES
 // =====================
 
-export type MessageRole = "user" | "assistant";
+export type MessageRole = "system" | "user" | "assistant";
 
-export interface Message {
+export interface Message<
+    METADATA = unknown,
+    DATA_PARTS = UIDataTypes,
+    TOOLS = UITools
+> {
     id: string;
     conversationId: string;
     role: MessageRole;
-    content: string;
+
+    metadata?: METADATA;
+
+    parts: Array<UIMessagePart<DATA_PARTS, TOOLS>>;
+
     createdAt: Date;
 }
 

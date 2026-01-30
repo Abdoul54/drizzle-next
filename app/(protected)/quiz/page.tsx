@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useCreateQuiz } from "@/hooks/queries/use-quiz";
 import { useRouter } from "next/navigation";
+import { useQuiz } from "@/hooks/use-quiz";
 
 const QUIZ_TYPES = [
     "multiple_choice",
@@ -38,6 +39,7 @@ type QuizFormData = z.infer<typeof schema>;
 export default function Page() {
     const createQuiz = useCreateQuiz();
     const router = useRouter()
+    const { setQuiz } = useQuiz()
 
     const form = useForm<QuizFormData>({
         resolver: zodResolver(schema),
@@ -56,6 +58,7 @@ export default function Page() {
             onSuccess: (result) => {
                 form.reset();
                 router.push(`/quiz/${result?.quiz?.id}`)
+                setQuiz(result?.quiz)
             },
         });
     };

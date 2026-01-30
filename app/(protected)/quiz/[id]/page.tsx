@@ -6,10 +6,12 @@ import { Message, MessageAction, MessageActions, MessageContent, MessageResponse
 import { PromptInput, PromptInputActionAddAttachments, PromptInputActionMenu, PromptInputActionMenuContent, PromptInputActionMenuTrigger, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputHeader, PromptInputMessage, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments } from '@/components/ai-elements/prompt-input';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { useConversationByQuizId } from '@/hooks/queries/use-conversations';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, UIMessage } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useParams } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 const PromptInputAttachmentsDisplay = () => {
     const attachments = usePromptInputAttachments();
@@ -35,14 +37,40 @@ const PromptInputAttachmentsDisplay = () => {
 };
 
 export default function Page() {
+    const { id } = useParams()
     const [webSearch, setWebSearch] = useState(false);
     const [input, setInput] = useState('');
 
+    const { data: conversation, error, isLoading } = useConversationByQuizId(id as string)
+
+    const initialMessages = conversation?.messages ? conversation?.messages : []
+
     const { messages, sendMessage, status, regenerate } = useChat({
         transport: new DefaultChatTransport({
-            api: '/api/chat',
+            api: '/api/chat'
         }),
+        messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[]
     });
+
+
+    useEffect(() => {
+        if (!isLoading && !error && conversation?.messages?.length === 0) {
+            const { quiz } = conversation;
+
+            sendMessage({
+                text: `
+# Create a Quiz
+
+**Title:** ${quiz?.title}
+\n**Category:** ${quiz?.category}
+\n**Allowed question types:** ${quiz?.types.join(", ")}
+
+Generate a set of questions following these constraints.
+`
+            });
+        }
+    }, [sendMessage, conversation, isLoading, error]);
+
 
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim()) {
@@ -50,6 +78,7 @@ export default function Page() {
             setInput('');
         }
     };
+
 
     return (
         <div className="flex flex-row h-[calc(100vh-6rem)]">

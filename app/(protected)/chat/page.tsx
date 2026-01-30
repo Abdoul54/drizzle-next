@@ -6,6 +6,7 @@ import { Message, MessageAction, MessageActions, MessageContent, MessageResponse
 import { PromptInput, PromptInputActionAddAttachments, PromptInputActionMenu, PromptInputActionMenuContent, PromptInputActionMenuTrigger, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputHeader, PromptInputMessage, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments } from '@/components/ai-elements/prompt-input';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import { useConversations } from '@/hooks/queries/use-conversations';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
@@ -37,6 +38,8 @@ const PromptInputAttachmentsDisplay = () => {
 export default function Page() {
     const [webSearch, setWebSearch] = useState(false);
     const [input, setInput] = useState('');
+
+    const data = useConversations()
 
     const { messages, sendMessage, status, regenerate } = useChat({
         transport: new DefaultChatTransport({

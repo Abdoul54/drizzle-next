@@ -1,6 +1,7 @@
 // hooks/use-conversations.ts
 "use client";
 
+import { Quiz } from "@/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 // Types
@@ -22,6 +23,7 @@ export type Message = {
 };
 
 export type ConversationWithMessages = Conversation & {
+    quiz: Quiz
     messages: Message[];
 };
 

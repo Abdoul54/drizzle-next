@@ -137,15 +137,30 @@ export const messages = pgTable(
     "messages",
     {
         id: text("id").primaryKey(),
+
         conversationId: text("conversation_id")
             .notNull()
             .references(() => conversations.id, { onDelete: "cascade" }),
-        role: text("role").notNull(), // 'user' | 'assistant'
-        content: text("content").notNull(),
-        createdAt: timestamp("created_at").defaultNow().notNull(),
+
+        role: text("role", {
+            enum: ["system", "user", "assistant"],
+        }).notNull(),
+
+        metadata: jsonb("metadata"), // UIMessage.metadata
+
+        parts: jsonb("parts").notNull(),
+        // Array<UIMessagePart>
+
+        createdAt: timestamp("created_at")
+            .defaultNow()
+            .notNull(),
     },
-    (table) => [index("message_conversation_idx").on(table.conversationId)]
+    (table) => [
+        index("message_conversation_idx").on(table.conversationId),
+        index("message_parts_gin").using("gin", table.parts)
+    ]
 );
+
 
 // Add relations
 export const conversationRelations = relations(conversations, ({ one, many }) => ({

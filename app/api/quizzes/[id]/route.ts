@@ -5,13 +5,22 @@ import { NextResponse } from "next/server";
 
 export async function GET(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
+        const { id } = await params;
+
+        if (!id) {
+            return NextResponse.json(
+                { error: "Invalid quiz ID" },
+                { status: 400 }
+            );
+        }
+
         const quiz = await db
             .select()
             .from(quizzes)
-            .where(eq(quizzes.id, params.id))
+            .where(eq(quizzes.id, id))
             .limit(1);
 
         if (!quiz.length) {
@@ -22,7 +31,7 @@ export async function GET(
         }
 
         return NextResponse.json(quiz[0]);
-    } catch (error) {
+    } catch {
         return NextResponse.json(
             { error: "Failed to fetch quiz" },
             { status: 500 }
@@ -32,12 +41,15 @@ export async function GET(
 
 export async function DELETE(
     request: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        await db.delete(quizzes).where(eq(quizzes.id, params.id));
+        const { id } = await params;
+
+        await db.delete(quizzes).where(eq(quizzes.id, id));
+
         return NextResponse.json({ success: true });
-    } catch (error) {
+    } catch {
         return NextResponse.json(
             { error: "Failed to delete quiz" },
             { status: 500 }

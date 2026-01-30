@@ -28,7 +28,8 @@ CREATE TABLE "messages" (
 	"id" text PRIMARY KEY NOT NULL,
 	"conversation_id" text NOT NULL,
 	"role" text NOT NULL,
-	"content" text NOT NULL,
+	"metadata" jsonb,
+	"parts" jsonb NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
@@ -81,5 +82,6 @@ CREATE INDEX "account_userId_idx" ON "account" USING btree ("user_id");--> state
 CREATE INDEX "conversation_user_idx" ON "conversations" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "conversation_quiz_idx" ON "conversations" USING btree ("quiz_id");--> statement-breakpoint
 CREATE INDEX "message_conversation_idx" ON "messages" USING btree ("conversation_id");--> statement-breakpoint
+CREATE INDEX "message_parts_gin" ON "messages" USING gin ("parts");--> statement-breakpoint
 CREATE INDEX "session_userId_idx" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verification_identifier_idx" ON "verification" USING btree ("identifier");
