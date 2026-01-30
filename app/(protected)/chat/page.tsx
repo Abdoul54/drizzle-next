@@ -6,7 +6,8 @@ import { Message, MessageAction, MessageActions, MessageContent, MessageResponse
 import { PromptInput, PromptInputActionAddAttachments, PromptInputActionMenu, PromptInputActionMenuContent, PromptInputActionMenuTrigger, PromptInputBody, PromptInputButton, PromptInputFooter, PromptInputHeader, PromptInputMessage, PromptInputSubmit, PromptInputTextarea, PromptInputTools, usePromptInputAttachments } from '@/components/ai-elements/prompt-input';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Shimmer } from '@/components/ai-elements/shimmer';
-import { useConversations } from '@/hooks/queries/use-conversations';
+import ChatSkeleton from '@/components/chat-skeleton';
+import { Progress } from '@/components/ui/progress';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon } from 'lucide-react';
@@ -39,7 +40,6 @@ export default function Page() {
     const [webSearch, setWebSearch] = useState(false);
     const [input, setInput] = useState('');
 
-    const data = useConversations()
 
     const { messages, sendMessage, status, regenerate } = useChat({
         transport: new DefaultChatTransport({
@@ -60,7 +60,7 @@ export default function Page() {
             <div className="flex flex-col h-full w-full">
                 <Conversation className="flex-1 overflow-hidden px-4">
                     <ConversationContent>
-                        {messages.map((message, messageIndex) => (
+                        {/* {messages.map((message, messageIndex) => (
                             <div key={message.id}>
                                 {message.parts?.map((part, i) => {
                                     switch (part.type) {
@@ -107,7 +107,11 @@ export default function Page() {
                                 })}
                             </div>
                         ))}
-                        {status === 'submitted' && <Shimmer>Thinking..</Shimmer>}
+                        {status === 'submitted' && <Shimmer>Thinking..</Shimmer>} */}
+                        <ChatSkeleton />
+
+
+
                     </ConversationContent>
                     <ConversationScrollButton />
                 </Conversation>
