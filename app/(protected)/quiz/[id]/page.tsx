@@ -54,7 +54,8 @@ export default function Page() {
         transport: new DefaultChatTransport({
             api: '/api/chat',
             body: {
-                conversationId
+                conversationId,
+                quizId: id
             }
         }),
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
@@ -78,8 +79,7 @@ export default function Page() {
 **Title:** ${quiz.title}
 **Category:** ${quiz.category}
 **Allowed question types:** ${quiz.types.join(", ")}
-
-Generate a set of questions following these constraints.`;
+`;
 
             sendMessage({ text: initialPrompt });
         }
@@ -93,6 +93,8 @@ Generate a set of questions following these constraints.`;
     };
 
 
+    console.log(status)
+
     return (
         <div className="flex flex-row h-[calc(100vh-6rem)]">
             <div className="flex flex-col h-full w-full">
@@ -105,7 +107,7 @@ Generate a set of questions following these constraints.`;
                             <ChatError error={error?.message} />
                             :
                             <ConversationContent>
-                                {messages.map((message, messageIndex) => (
+                                {messages.map((message) => (
                                     <div key={message.id}>
                                         {message.parts?.map((part, i) => {
                                             switch (part.type) {

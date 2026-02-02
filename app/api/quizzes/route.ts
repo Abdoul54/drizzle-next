@@ -5,8 +5,9 @@ import { generateAttachmentKey, uploadFile } from "@/lib/storage";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
 import { embed } from "ai";
-import { ollama } from "ollama-ai-provider-v2";
-import { extractText } from "unpdf"
+import { openai } from "@ai-sdk/openai";
+import { extractText } from "unpdf";
+import mammoth from "mammoth";
 
 export async function GET() {
     try {
@@ -51,9 +52,8 @@ export async function POST(request: Request) {
                 let embedding: number[] | null = null;
 
                 if (textContent) {
-                    const model = ollama.embedding("nomic-embed-text");
                     const { embedding: embeddingResult } = await embed({
-                        model: model,
+                        model: openai.embedding("text-embedding-3-small"),
                         value: textContent,
                     });
                     embedding = embeddingResult;
@@ -66,6 +66,7 @@ export async function POST(request: Request) {
                     url,
                     mimeType: file.type,
                     size: file.size,
+                    content: textContent,
                     embedding,
                 };
             })
@@ -126,14 +127,18 @@ async function extractTextFromBuffer(buffer: Buffer, mimeType: string): Promise<
     }
 
     if (mimeType === "application/pdf") {
-        return await extractTextFromPdf(buffer);
+        const uint8 = new Uint8Array(buffer);
+        const { text } = await extractText(uint8, { mergePages: true });
+        return text;
+    }
+
+    if (
+        mimeType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        mimeType === "application/msword"
+    ) {
+        const { value } = await mammoth.extractRawText({ buffer });
+        return value;
     }
 
     return null;
-}
-
-async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-    const uint8 = new Uint8Array(buffer)
-    const { text } = await extractText(uint8, { mergePages: true })
-    return text
 }

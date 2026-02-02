@@ -1,5 +1,8 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, jsonb, integer, vector } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb, integer, vector, pgEnum } from "drizzle-orm/pg-core";
+
+
+export const statusEnum = pgEnum('status', ['draft', 'published', 'unpublished']);
 
 
 export const user = pgTable("user", {
@@ -104,7 +107,14 @@ export const quizzes = pgTable(
         title: text("title").notNull(),
         description: text("description").notNull(),
         category: text("category").notNull(),
-        types: jsonb("types").notNull()
+        status: statusEnum(),
+        types: jsonb("types").notNull(),
+        data: jsonb('data'),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at")
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
     }
 )
 
@@ -151,8 +161,10 @@ export const messages = pgTable(
         parts: jsonb("parts").notNull(),
         // Array<UIMessagePart>
 
-        createdAt: timestamp("created_at")
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at")
             .defaultNow()
+            .$onUpdate(() => new Date())
             .notNull(),
     },
     (table) => [
@@ -172,8 +184,13 @@ export const attachments = pgTable(
         url: text("url").notNull(),
         mimeType: text("mime_type").notNull(),
         size: integer("size").notNull(),
-        embedding: vector("embedding", { dimensions: 768 }),
+        content: text("content"),
+        embedding: vector("embedding", { dimensions: 1536 }),
         createdAt: timestamp("created_at").defaultNow().notNull(),
+        updatedAt: timestamp("updated_at")
+            .defaultNow()
+            .$onUpdate(() => new Date())
+            .notNull(),
     },
     (table) => [
         index("attachment_conversation_idx").on(table.conversationId),

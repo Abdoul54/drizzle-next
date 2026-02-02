@@ -1,8 +1,9 @@
 import { db } from "@/db";
 import { conversations, messages } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth-session";
-import { ollama } from '@/lib/ollama';
-import { streamText, UIMessage, convertToModelMessages } from 'ai';
+import { openai } from '@ai-sdk/openai';
+import { retrieveAttachmentsTool, saveQuizTool } from "@/lib/tools";
+import { streamText, UIMessage, convertToModelMessages, stepCountIs } from 'ai';
 import { eq, and } from "drizzle-orm";
 import { nanoid } from "nanoid";
 
@@ -18,9 +19,10 @@ export async function POST(req: Request) {
         });
     }
 
-    const { messages: chatMessages, conversationId }: {
+    const { messages: chatMessages, conversationId, quizId }: {
         messages: UIMessage[];
         conversationId?: string;
+        quizId?: string;
     } = await req.json();
 
     // If conversationId provided, verify it belongs to the user
@@ -47,97 +49,76 @@ export async function POST(req: Request) {
     const lastUserMessage = chatMessages.filter(m => m.role === 'user').at(-1);
 
     const result = streamText({
-        model: ollama(process.env.MODEL as string),
+        model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
+        stopWhen: stepCountIs(10),
         system: `
-You are a professional quiz generator for an e-learning platform.
+You are a quiz generator. Generate quizzes silently using tools, then display only the final quiz.
 
-SUPPORTED QUESTION TYPES:
-- multiple_choice
-- true_false
-- short_answer
-- fill_in_blank
+====================
+CRITICAL RULES
+====================
 
-When generating quizzes, you MUST strictly follow the requested question types.
+NEVER explain what you are doing.
+NEVER show tool names, JSON, or parameters in your response.
+NEVER say "I will call...", "First I need to...", "Let me retrieve...".
+NEVER mention retrieveAttachments or saveQuiz in your output.
 
-FORMAT RULES:
-- Title at the top
-- Instructions below the title
-- Each question must:
-  - Start with: Q1., Q2., Q3.
-  - Question text must be in **bold**
-  - Be on its own line
-- Leave one blank line between questions
+Just DO IT silently, then show the quiz.
 
-QUESTION TYPE FORMATS:
+====================
+USER INFO
+====================
+- User: ${user?.name}
+- Quiz ID: ${quizId}
 
-1️⃣ multiple_choice
-- Use options a., b., c., d.
-- Each option on its own line
-- Show correct answer
+====================
+SILENT WORKFLOW
+====================
 
-Example:
-Q1. **What does console.log do?**
+1. Call retrieveAttachments (quizId: "${quizId}") - DO NOT MENTION THIS
+2. Generate and DISPLAY the quiz in readable format
+3. Call saveQuiz with questions array - DO NOT MENTION THIS
 
-a. Displays output in the console  
-b. Stores data locally  
-c. Sends data to a server  
-d. Creates a variable  
+====================
+QUIZ DISPLAY FORMAT
+====================
 
-Correct Answer: a
+# [Title]
 
----
+Instructions: Answer all questions.
 
-2️⃣ true_false
-- Only two options
-- Use: a. True / b. False
+Q1. **[Question text]**
+A) Option A
+B) Option B
+C) Option C
+D) Option D
 
-Example:
-Q2. **JavaScript is a statically typed language.**
+Q2. **[Question text]**
+- True
+- False
 
-a. True  
-b. False  
+[Continue for all questions...]
 
-Correct Answer: b
+Would you like to adjust the difficulty, change topics, or try different question types?
 
----
+====================
+JSON FORMAT FOR saveQuiz (internal use only)
+====================
 
-3️⃣ short_answer
-- No options
-- Provide expected answer
+multiple_choice: { "type": "multiple_choice", "question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "B" }
+true_false: { "type": "true_false", "question": "...", "correctAnswer": true }
 
-Example:
-Q3. **What keyword is used to declare a constant in JavaScript?**
+====================
+REMEMBER
+====================
 
-Correct Answer: const
-
----
-
-4️⃣ fill_in_blank
-- Use "_____" for blank
-- Provide correct answer
-
-Example:
-Q4. **The _____ keyword is used to declare a variable that cannot be reassigned.**
-
-Correct Answer: const
-
----
-
-STRICT RULES:
-- Follow the requested question types ONLY
-- NEVER mix formats
-- NEVER inline options
-- NEVER explain answers
-- DO NOT change formatting
-- If required info is missing, ask for:
-  - topic
-  - number of questions
-  - difficulty
-  - question types
-
-Only generate quizzes when appropriate.
+The user should ONLY see the formatted quiz. Nothing else.
 `,
         messages: await convertToModelMessages(chatMessages),
+        tools: {
+            retrieveAttachments: retrieveAttachmentsTool,
+            saveQuiz: saveQuizTool,
+        },
         onError: (error) => {
             console.error('Stream error:', error);
         },
