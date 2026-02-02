@@ -88,6 +88,9 @@ export default function SignIn() {
                                     onResponse: () => {
                                         setLoading(false);
                                     },
+                                    onSuccess: () => {
+                                        router.push("/")
+                                    }
                                 },
                             });
                         }}

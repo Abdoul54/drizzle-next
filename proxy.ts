@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 
-export async function proxy(request: NextRequest) {
-    const sessionCookie = getSessionCookie(request);
+export function proxy(request: NextRequest) {
+    const session = getSessionCookie(request);
 
-    if (!sessionCookie) {
+    if (!session) {
         return NextResponse.redirect(new URL("/login", request.url));
     }
 
@@ -12,5 +12,9 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ["/", "/quiz"],
+    matcher: [
+        "/",
+        "/chat/:path*",
+        "/quiz/:path*",
+    ],
 };

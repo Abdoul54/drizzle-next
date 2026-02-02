@@ -9,7 +9,10 @@ import {
     Layers,
     CheckSquare,
     Sparkles,
+    Paperclip,
+    X,
 } from "lucide-react";
+import { useState } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -27,6 +30,13 @@ const QUIZ_TYPES = [
     "fill_in_blank",
 ] as const;
 
+const ACCEPTED_FILE_TYPES = [
+    "application/pdf",
+    "text/plain",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+];
+
 const schema = z.object({
     title: z.string().min(1, "Title is required"),
     description: z.string().min(1, "Description is required"),
@@ -38,8 +48,9 @@ type QuizFormData = z.infer<typeof schema>;
 
 export default function Page() {
     const createQuiz = useCreateQuiz();
-    const router = useRouter()
-    const { setQuiz } = useQuiz()
+    const router = useRouter();
+    const { setQuiz } = useQuiz();
+    const [files, setFiles] = useState<File[]>([]);
 
     const form = useForm<QuizFormData>({
         resolver: zodResolver(schema),
@@ -53,14 +64,31 @@ export default function Page() {
 
     const isPending = createQuiz.isPending;
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const selectedFiles = Array.from(e.target.files || []);
+        const validFiles = selectedFiles.filter((file) =>
+            ACCEPTED_FILE_TYPES.includes(file.type)
+        );
+        setFiles((prev) => [...prev, ...validFiles]);
+        e.target.value = ""; // Reset input
+    };
+
+    const removeFile = (index: number) => {
+        setFiles((prev) => prev.filter((_, i) => i !== index));
+    };
+
     const onSubmit = async (data: QuizFormData) => {
-        createQuiz.mutateAsync(data, {
-            onSuccess: (result) => {
-                form.reset();
-                router.push(`/quiz/${result?.quiz?.id}`)
-                setQuiz(result?.quiz)
-            },
-        });
+        createQuiz.mutateAsync(
+            { ...data, files },
+            {
+                onSuccess: (result) => {
+                    form.reset();
+                    setFiles([]);
+                    router.push(`/quiz/${result?.quiz?.id}`);
+                    setQuiz(result?.quiz);
+                },
+            }
+        );
     };
 
     return (
@@ -68,9 +96,7 @@ export default function Page() {
             <div className="w-full max-w-3xl bg-background rounded-xl shadow-sm border p-8">
                 <div className="mb-6 flex items-center gap-3">
                     <Sparkles className="text-primary" />
-                    <h1 className="text-2xl font-semibold">
-                        Create AI Quiz
-                    </h1>
+                    <h1 className="text-2xl font-semibold">Create AI Quiz</h1>
                 </div>
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -105,7 +131,9 @@ export default function Page() {
                                 />
                             )}
                         />
-                        <FieldError>{form.formState.errors.description?.message}</FieldError>
+                        <FieldError>
+                            {form.formState.errors.description?.message}
+                        </FieldError>
                     </Field>
 
                     {/* Category */}
@@ -164,11 +192,59 @@ export default function Page() {
                         <FieldError>{form.formState.errors.types?.message}</FieldError>
                     </Field>
 
-                    <Button
-                        type="submit"
-                        className="w-full gap-2"
-                        disabled={isPending}
-                    >
+                    {/* File Upload */}
+                    <Field>
+                        <FieldLabel className="flex items-center gap-2">
+                            <Paperclip size={16} /> Attachments (optional)
+                        </FieldLabel>
+                        <p className="text-sm text-muted-foreground mb-2">
+                            Upload PDFs or documents for the AI to generate questions from
+                        </p>
+
+                        <label className="flex items-center justify-center gap-2 border border-dashed rounded-md px-4 py-6 hover:bg-muted cursor-pointer transition-colors">
+                            <Paperclip size={18} className="text-muted-foreground" />
+                            <span className="text-sm text-muted-foreground">
+                                Click to upload files
+                            </span>
+                            <input
+                                type="file"
+                                multiple
+                                accept={ACCEPTED_FILE_TYPES.join(",")}
+                                onChange={handleFileChange}
+                                className="hidden"
+                            />
+                        </label>
+
+                        {files.length > 0 && (
+                            <div className="mt-3 space-y-2">
+                                {files.map((file, index) => (
+                                    <div
+                                        key={index}
+                                        className="flex items-center justify-between bg-muted rounded-md px-3 py-2"
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <FileText size={16} className="shrink-0" />
+                                            <span className="text-sm truncate">{file.name}</span>
+                                            <span className="text-xs text-muted-foreground shrink-0">
+                                                ({(file.size / 1024).toFixed(1)} KB)
+                                            </span>
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-6 w-6 shrink-0"
+                                            onClick={() => removeFile(index)}
+                                        >
+                                            <X size={14} />
+                                        </Button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Field>
+
+                    <Button type="submit" className="w-full gap-2" disabled={isPending}>
                         <Sparkles size={18} />
                         {isPending ? "Generating..." : "Generate Quiz"}
                     </Button>

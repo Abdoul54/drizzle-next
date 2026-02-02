@@ -1,8 +1,12 @@
 import { db } from "@/db";
-import { quizzes, conversations } from "@/db/schema";
+import { quizzes, conversations, attachments } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth-session";
+import { generateAttachmentKey, uploadFile } from "@/lib/storage";
 import { nanoid } from "nanoid";
 import { NextResponse } from "next/server";
+import { embed } from "ai";
+import { ollama } from "ollama-ai-provider-v2";
+import { extractText } from "unpdf"
 
 export async function GET() {
     try {
@@ -24,21 +28,58 @@ export async function POST(request: Request) {
     }
 
     try {
-        const body = await request.json();
+        const formData = await request.formData();
+
+        const title = formData.get("title") as string;
+        const description = formData.get("description") as string;
+        const category = formData.get("category") as string;
+        const types = JSON.parse(formData.get("types") as string);
+
+        const files = formData.getAll("files") as File[];
 
         const quizId = nanoid();
         const conversationId = nanoid();
 
-        // Create both quiz and conversation in a transaction
+        const uploadedFiles = await Promise.all(
+            files.map(async (file) => {
+                const key = generateAttachmentKey(conversationId, file.name);
+                const buffer = Buffer.from(await file.arrayBuffer());
+                const { url } = await uploadFile(key, buffer, file.type);
+
+                const textContent = await extractTextFromBuffer(buffer, file.type);
+
+                let embedding: number[] | null = null;
+
+                if (textContent) {
+                    const model = ollama.embedding("nomic-embed-text");
+                    const { embedding: embeddingResult } = await embed({
+                        model: model,
+                        value: textContent,
+                    });
+                    embedding = embeddingResult;
+                }
+
+                return {
+                    id: nanoid(),
+                    conversationId,
+                    filename: file.name,
+                    url,
+                    mimeType: file.type,
+                    size: file.size,
+                    embedding,
+                };
+            })
+        );
+
         const result = await db.transaction(async (tx) => {
             const [newQuiz] = await tx
                 .insert(quizzes)
                 .values({
                     id: quizId,
-                    title: body.title,
-                    description: body.description,
-                    category: body.category,
-                    types: body.types,
+                    title,
+                    description,
+                    category,
+                    types,
                 })
                 .returning();
 
@@ -46,13 +87,25 @@ export async function POST(request: Request) {
                 .insert(conversations)
                 .values({
                     id: conversationId,
-                    title: body.title, // Use quiz title as conversation title
+                    title,
                     userId: user.id,
-                    quizId: quizId,
+                    quizId,
                 })
                 .returning();
 
-            return { quiz: newQuiz, conversation: newConversation };
+            let newAttachments: typeof uploadedFiles = [];
+            if (uploadedFiles.length > 0) {
+                newAttachments = await tx
+                    .insert(attachments)
+                    .values(uploadedFiles)
+                    .returning();
+            }
+
+            return {
+                quiz: newQuiz,
+                conversation: newConversation,
+                attachments: newAttachments,
+            };
         });
 
         return NextResponse.json(result, { status: 201 });
@@ -63,4 +116,24 @@ export async function POST(request: Request) {
             { status: 500 }
         );
     }
+}
+
+async function extractTextFromBuffer(buffer: Buffer, mimeType: string): Promise<string | null> {
+    const textTypes = ["text/plain", "text/markdown", "text/csv"];
+
+    if (textTypes.includes(mimeType)) {
+        return buffer.toString("utf-8");
+    }
+
+    if (mimeType === "application/pdf") {
+        return await extractTextFromPdf(buffer);
+    }
+
+    return null;
+}
+
+async function extractTextFromPdf(buffer: Buffer): Promise<string> {
+    const uint8 = new Uint8Array(buffer)
+    const { text } = await extractText(uint8, { mergePages: true })
+    return text
 }

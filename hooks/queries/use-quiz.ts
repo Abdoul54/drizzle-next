@@ -22,7 +22,13 @@ export type CreateQuizResponse = {
     conversation: Conversation;
 };
 
-type CreateQuizInput = Omit<Quiz, "id">;
+interface CreateQuizInput {
+    title: string;
+    description: string;
+    category: string;
+    types: string[];
+    files?: File[];
+}
 
 const fetchQuizzes = async (): Promise<Quiz[]> => {
     const res = await fetch("/api/quizzes");
@@ -69,19 +75,38 @@ export const useQuiz = (id: string) => {
     });
 };
 
-export const useCreateQuiz = () => {
+export function useCreateQuiz() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: createQuiz,
-        onSuccess: (data) => {
+        mutationFn: async (data: CreateQuizInput) => {
+            const formData = new FormData();
+
+            formData.append("title", data.title);
+            formData.append("description", data.description);
+            formData.append("category", data.category);
+            formData.append("types", JSON.stringify(data.types));
+
+            data.files?.forEach((file) => {
+                formData.append("files", file);
+            });
+
+            const response = await fetch("/api/quizzes", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error("Failed to create quiz");
+            }
+
+            return response.json();
+        },
+        onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["quizzes"] });
-            // Also invalidate conversations if you have a conversations query
-            queryClient.invalidateQueries({ queryKey: ["conversations"] });
         },
     });
-};
-
+}
 export const useDeleteQuiz = () => {
     const queryClient = useQueryClient();
 

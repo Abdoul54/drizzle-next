@@ -18,6 +18,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { useQuiz } from "@/hooks/use-quiz"
 import { useQuizzes } from "@/hooks/queries/use-quiz"
 import { Quiz } from "@/types"
+import { Button } from "./ui/button"
 
 
 
@@ -38,6 +39,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <div className="flex justify-center items-center gap-2 font-bold text-xl py-1"><GraduationCap />Quizzes</div>
             </SidebarHeader>
             <SidebarContent>
+                <SidebarGroup>
+                    <SidebarGroupContent>
+                        <SidebarMenu>
+                            <Button onClick={() => router.push("/quiz")}>New Quiz</Button>
+                        </SidebarMenu>
+                    </SidebarGroupContent>
+                </SidebarGroup>
                 <SidebarGroup>
                     <SidebarGroupContent>
                         <SidebarMenu>

@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm";
-import { pgTable, text, timestamp, boolean, index, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, boolean, index, jsonb, integer, vector } from "drizzle-orm/pg-core";
 
 
 export const user = pgTable("user", {
@@ -161,6 +161,31 @@ export const messages = pgTable(
     ]
 );
 
+export const attachments = pgTable(
+    "attachments",
+    {
+        id: text("id").primaryKey(),
+        conversationId: text("conversation_id")
+            .notNull()
+            .references(() => conversations.id, { onDelete: "cascade" }),
+        filename: text("filename").notNull(),
+        url: text("url").notNull(),
+        mimeType: text("mime_type").notNull(),
+        size: integer("size").notNull(),
+        embedding: vector("embedding", { dimensions: 768 }),
+        createdAt: timestamp("created_at").defaultNow().notNull(),
+    },
+    (table) => [
+        index("attachment_conversation_idx").on(table.conversationId),
+        index("attachment_embedding_idx").using("hnsw", table.embedding.op("vector_cosine_ops")),
+    ]);
+
+export const attachmentRelations = relations(attachments, ({ one }) => ({
+    conversation: one(conversations, {
+        fields: [attachments.conversationId],
+        references: [conversations.id],
+    }),
+}));
 
 // Add relations
 export const conversationRelations = relations(conversations, ({ one, many }) => ({
@@ -173,6 +198,7 @@ export const conversationRelations = relations(conversations, ({ one, many }) =>
         references: [quizzes.id],
     }),
     messages: many(messages),
+    attachments: many(attachments),
 }));
 
 export const quizRelations = relations(quizzes, ({ one }) => ({
