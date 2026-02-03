@@ -111,6 +111,9 @@ fill_in_blank: { "type": "fill_in_blank", "question": "The ___ is...", "correctA
         tools: {
             retrieveAttachments: retrieveAttachmentsTool,
             saveQuiz: saveQuizTool,
+            web_search: openai.tools.webSearch({
+                externalWebAccess: true,
+            })
         },
         onStepFinish: ({ toolCalls, toolResults }) => {
             console.log('Step finished:', { toolCalls, toolResults });

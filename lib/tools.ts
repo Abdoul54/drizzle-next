@@ -25,7 +25,7 @@ export const retrieveAttachmentsTool = tool({
     },
 });
 
-const questionSchema = z.discriminatedUnion("type", [
+export const questionSchema = z.discriminatedUnion("type", [
     z.object({
         type: z.literal("multiple_choice"),
         question: z.string(),

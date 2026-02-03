@@ -8,11 +8,13 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-e
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import ChatError from '@/components/chat-error';
 import ChatSkeleton from '@/components/chat-skeleton';
+import { SelectionPopover } from '@/components/selection-popover';
+import { Button } from '@/components/ui/button';
 import { useConversationByQuizId } from '@/hooks/queries/use-conversations';
 import { useQuiz } from '@/hooks/queries/use-quiz';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
-import { GlobeIcon } from 'lucide-react';
+import { GlobeIcon, Sparkles } from 'lucide-react';
 import { useParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
@@ -45,13 +47,15 @@ export default function Page() {
     const [input, setInput] = useState('');
     const initialMessageSentRef = useRef(false);
 
-    const [tool, setTool] = useState('')
-
     const { data: conversation, error, isLoading } = useConversationByQuizId(id as string);
-    const { data: quiz, isLoading: isQuizLoading, error: quizError } = useQuiz(id as string)
 
-    // console.log(quiz)
+    const [additionals, setAdditionals] = useState("")
 
+    // console.log(additionals)
+
+    const askAgent = async (text: string) => {
+        setAdditionals(text)
+    };
 
     const conversationId = conversation?.id;
     const initialMessages = conversation?.messages ?? [];
@@ -110,6 +114,8 @@ export default function Page() {
         }
     };
 
+    console.log(messages);
+    
 
     return (
         <div className="flex flex-row h-[calc(100vh-6rem)]">
@@ -123,37 +129,46 @@ export default function Page() {
                             <ChatError error={error?.message} />
                             :
                             <ConversationContent>
-                                {messages.map((message) => (
-                                    <div key={message.id}>
-                                        {message.parts?.map((part, i) => {
-                                            switch (part.type) {
-                                                case 'text':
-                                                    return (
-                                                        <Message key={`${message.id}-${i}`} from={message.role}>
-                                                            <MessageContent>
-                                                                <MessageResponse>
-                                                                    {part.text}
-                                                                </MessageResponse>
-                                                            </MessageContent>
-                                                        </Message>
-                                                    );
-                                                case 'reasoning':
-                                                    return (
-                                                        <Reasoning
-                                                            key={`${message.id}-${i}`}
-                                                            className="w-full"
-                                                            isStreaming={status === 'streaming' && i === message.parts!.length - 1 && message.id === messages.at(-1)?.id}
-                                                        >
-                                                            <ReasoningTrigger />
-                                                            <ReasoningContent>{part.text}</ReasoningContent>
-                                                        </Reasoning>
-                                                    );
-                                                default:
-                                                    return null;
-                                            }
-                                        })}
-                                    </div>
-                                ))}
+                                <SelectionPopover
+                                    renderActions={(text) => (
+                                        <Button size="sm" onClick={() => askAgent(text)}>
+                                            <Sparkles className="mr-2 h-4 w-4" />
+                                            Ask Agent
+                                        </Button>
+                                    )}
+                                >
+                                    {messages.map((message) => (
+                                        <div key={message.id}>
+                                            {message.parts?.map((part, i) => {
+                                                switch (part.type) {
+                                                    case 'text':
+                                                        return (
+                                                            <Message key={`${message.id}-${i}`} from={message.role}>
+                                                                <MessageContent>
+                                                                    <MessageResponse>
+                                                                        {part.text}
+                                                                    </MessageResponse>
+                                                                </MessageContent>
+                                                            </Message>
+                                                        );
+                                                    case 'reasoning':
+                                                        return (
+                                                            <Reasoning
+                                                                key={`${message.id}-${i}`}
+                                                                className="w-full"
+                                                                isStreaming={status === 'streaming' && i === message.parts!.length - 1 && message.id === messages.at(-1)?.id}
+                                                            >
+                                                                <ReasoningTrigger />
+                                                                <ReasoningContent>{part.text}</ReasoningContent>
+                                                            </Reasoning>
+                                                        );
+                                                    default:
+                                                        return null;
+                                                }
+                                            })}
+                                        </div>
+                                    ))}
+                                </SelectionPopover>
                                 {status === 'submitted' && <Shimmer>Thinking...</Shimmer>}
                                 {status === 'streaming' && activeTool && (
                                     <Shimmer>Using Tools...</Shimmer>
