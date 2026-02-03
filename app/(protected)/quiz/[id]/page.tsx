@@ -9,6 +9,7 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
 import ChatError from '@/components/chat-error';
 import ChatSkeleton from '@/components/chat-skeleton';
 import { useConversationByQuizId } from '@/hooks/queries/use-conversations';
+import { useQuiz } from '@/hooks/queries/use-quiz';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
 import { GlobeIcon } from 'lucide-react';
@@ -44,22 +45,39 @@ export default function Page() {
     const [input, setInput] = useState('');
     const initialMessageSentRef = useRef(false);
 
+    const [tool, setTool] = useState('')
+
     const { data: conversation, error, isLoading } = useConversationByQuizId(id as string);
+    const { data: quiz, isLoading: isQuizLoading, error: quizError } = useQuiz(id as string)
+
+    // console.log(quiz)
+
 
     const conversationId = conversation?.id;
     const initialMessages = conversation?.messages ?? [];
 
+    const [activeTool, setActiveTool] = useState<string | null>(null);
+
     const { messages, sendMessage, status } = useChat({
-        id: conversationId, // Use conversationId as chat id
+        id: conversationId,
         transport: new DefaultChatTransport({
             api: '/api/chat',
-            body: {
-                conversationId,
-                quizId: id
-            }
+            body: { conversationId, quizId: id }
         }),
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
+
+        onToolCall({ toolCall }) {
+            setActiveTool(toolCall.toolName);
+        },
+
+        onFinish() {
+            setActiveTool(null); // Reset when generation completes
+        },
     });
+
+    // Derive tool status from state
+    const isToolRunning = activeTool !== null && status === 'streaming';
+
     // Send initial quiz generation message
     useEffect(() => {
         if (
@@ -92,8 +110,6 @@ export default function Page() {
         }
     };
 
-
-    console.log(status)
 
     return (
         <div className="flex flex-row h-[calc(100vh-6rem)]">
@@ -138,7 +154,13 @@ export default function Page() {
                                         })}
                                     </div>
                                 ))}
-                                {status === 'submitted' && <Shimmer>Thinking..</Shimmer>}
+                                {status === 'submitted' && <Shimmer>Thinking...</Shimmer>}
+                                {status === 'streaming' && activeTool && (
+                                    <Shimmer>Using Tools...</Shimmer>
+                                )}
+                                {status === 'streaming' && !activeTool && (
+                                    <Shimmer>Generating...</Shimmer>
+                                )}
                             </ConversationContent>
                     }
                     <ConversationScrollButton />

@@ -25,7 +25,6 @@ export async function POST(req: Request) {
         quizId?: string;
     } = await req.json();
 
-    // If conversationId provided, verify it belongs to the user
     let validConversationId: string | null = null;
 
     if (conversationId) {
@@ -45,94 +44,88 @@ export async function POST(req: Request) {
         }
     }
 
-    // Get the last user message (the one being sent now)
     const lastUserMessage = chatMessages.filter(m => m.role === 'user').at(-1);
 
     const result = streamText({
         model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
         stopWhen: stepCountIs(10),
+        prepareStep: ({ steps }) => {
+            const calledTools = steps.flatMap(step =>
+                step.toolCalls?.map(call => call.toolName) ?? []
+            );
+
+            const hasRetrieved = calledTools.includes('retrieveAttachments');
+            const hasSaved = calledTools.includes('saveQuiz');
+
+            // Step 1: Force retrieveAttachments
+            if (!hasRetrieved) {
+                return {
+                    toolChoice: { type: 'tool', toolName: 'retrieveAttachments' }
+                };
+            }
+
+            // Step 2: Force saveQuiz after retrieval
+            if (hasRetrieved && !hasSaved) {
+                return {
+                    toolChoice: { type: 'tool', toolName: 'saveQuiz' }
+                };
+            }
+
+            // Step 3: After both tools called, generate text response
+            return { toolChoice: 'none' };
+        },
         system: `
-You are a quiz generator. Generate quizzes silently using tools, then display only the final quiz.
+You are a quiz generator.
 
-====================
-CRITICAL RULES
-====================
+Information:
+- User's name is ${user?.name}
+- User speaks english
+- quizId is ${quizId}
 
-NEVER explain what you are doing.
-NEVER show tool names, JSON, or parameters in your response.
-NEVER say "I will call...", "First I need to...", "Let me retrieve...".
-NEVER mention retrieveAttachments or saveQuiz in your output.
+RULES:
+- Do not mention tools or internal steps
+- When calling saveQuiz, return ONLY a JSON array of questions
+- After tools complete, display the quiz in the format below
 
-Just DO IT silently, then show the quiz.
-
-====================
-USER INFO
-====================
-- User: ${user?.name}
-- Quiz ID: ${quizId}
-
-====================
-SILENT WORKFLOW
-====================
-
-1. Call retrieveAttachments (quizId: "${quizId}") - DO NOT MENTION THIS
-2. Generate and DISPLAY the quiz in readable format
-3. Call saveQuiz with questions array - DO NOT MENTION THIS
-
-====================
-QUIZ DISPLAY FORMAT
-====================
-
+QUIZ DISPLAY FORMAT:
 # [Title]
 
-Instructions: Answer all questions.
+Q1. **Question**
+A) ...
+B) ...
+C) ...
+D) ...
 
-Q1. **[Question text]**
-A) Option A
-B) Option B
-C) Option C
-D) Option D
-
-Q2. **[Question text]**
+Q2. **Question**
 - True
 - False
 
-[Continue for all questions...]
-
-Would you like to adjust the difficulty, change topics, or try different question types?
-
-====================
-JSON FORMAT FOR saveQuiz (internal use only)
-====================
-
-multiple_choice: { "type": "multiple_choice", "question": "...", "options": ["A", "B", "C", "D"], "correctAnswer": "B" }
+QUESTION JSON FORMATS:
+multiple_choice: { "type": "multiple_choice", "question": "...", "options": ["A","B","C","D"], "correctAnswer": "B" }
 true_false: { "type": "true_false", "question": "...", "correctAnswer": true }
-
-====================
-REMEMBER
-====================
-
-The user should ONLY see the formatted quiz. Nothing else.
-`,
+short_answer: { "type": "short_answer", "question": "..." }
+fill_in_blank: { "type": "fill_in_blank", "question": "The ___ is...", "correctAnswer": "answer" }
+`
+        ,
         messages: await convertToModelMessages(chatMessages),
         tools: {
             retrieveAttachments: retrieveAttachmentsTool,
             saveQuiz: saveQuizTool,
         },
+        onStepFinish: ({ toolCalls, toolResults }) => {
+            console.log('Step finished:', { toolCalls, toolResults });
+        },
         onError: (error) => {
             console.error('Stream error:', error);
         },
         onFinish: async ({ text, response }) => {
-            // Only save if we have a valid conversation
             if (!validConversationId) {
                 console.log('No valid conversationId, skipping message save');
                 return;
             }
 
             try {
-                // Save the user message if it exists and hasn't been saved yet
                 if (lastUserMessage) {
-                    // Check if this message already exists
                     const [existingUserMsg] = await db
                         .select()
                         .from(messages)
@@ -150,7 +143,6 @@ The user should ONLY see the formatted quiz. Nothing else.
                     }
                 }
 
-                // Save the assistant message
                 const assistantMessageId = response.id || nanoid();
 
                 await db.insert(messages).values({
@@ -161,7 +153,6 @@ The user should ONLY see the formatted quiz. Nothing else.
                     metadata: null,
                 });
 
-                // Update conversation's updatedAt timestamp
                 await db
                     .update(conversations)
                     .set({ updatedAt: new Date() })
