@@ -10,7 +10,32 @@ import {
     integer,
     jsonb,
     index,
+    pgEnum,
 } from "drizzle-orm/pg-core";
+
+
+// =============================================
+// ENUMS
+// =============================================
+export const quizStatusEnum = pgEnum("quiz_status", [
+    "draft",
+    "published",
+    "unpublished",
+]);
+
+export const questionTypeEnum = pgEnum("question_type", [
+    "choice",
+    "true-false",
+    "fill-in",
+    "long-fill-in",
+    "matching",
+    "sequencing",
+    "numeric",
+    "likert",
+    "performance",
+]);
+
+
 
 // =============================================
 // AUTH TABLES
@@ -98,6 +123,7 @@ export const quiz = pgTable("quiz", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     title: varchar("title", { length: 255 }).notNull(),
     description: varchar("description", { length: 255 }).notNull(),
+    status: quizStatusEnum("status").notNull().default("draft"),
     createdBy: text("created_by")
         .notNull()
         .references(() => user.id, { onDelete: "cascade" }),
@@ -113,7 +139,7 @@ export const question = pgTable("question", {
     quizId: bigint("quiz_id", { mode: "number" })
         .notNull()
         .references(() => quiz.id, { onDelete: "cascade" }),
-    type: integer("type").notNull(),
+    type: questionTypeEnum("type").notNull(),
     media: varchar("media", { length: 255 }),
     text: varchar("text", { length: 255 }).notNull(),
     subText: varchar("sub_text", { length: 255 }),

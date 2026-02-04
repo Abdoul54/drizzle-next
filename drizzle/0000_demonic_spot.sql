@@ -1,3 +1,5 @@
+CREATE TYPE "public"."question_type" AS ENUM('choice', 'true-false', 'fill-in', 'long-fill-in', 'matching', 'sequencing', 'numeric', 'likert', 'performance');--> statement-breakpoint
+CREATE TYPE "public"."quiz_status" AS ENUM('draft', 'published', 'unpublished');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
 	"account_id" text NOT NULL,
@@ -46,7 +48,7 @@ CREATE TABLE "option" (
 CREATE TABLE "question" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"quiz_id" bigint NOT NULL,
-	"type" integer NOT NULL,
+	"type" "question_type" NOT NULL,
 	"media" varchar(255),
 	"text" varchar(255) NOT NULL,
 	"sub_text" varchar(255)
@@ -56,6 +58,7 @@ CREATE TABLE "quiz" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"title" varchar(255) NOT NULL,
 	"description" varchar(255) NOT NULL,
+	"status" "quiz_status" DEFAULT 'draft' NOT NULL,
 	"created_by" text NOT NULL,
 	"created_at" timestamp (0) DEFAULT now() NOT NULL,
 	"updated_at" timestamp (0) DEFAULT now() NOT NULL

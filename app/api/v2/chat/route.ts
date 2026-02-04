@@ -1,11 +1,6 @@
-import { db } from "@/db";
-import { conversations, messages } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth-session";
 import { openai } from '@ai-sdk/openai';
-import { retrieveAttachmentsTool, saveQuizTool } from "@/lib/tools";
-import { streamText, UIMessage, convertToModelMessages, stepCountIs } from 'ai';
-import { eq, and } from "drizzle-orm";
-import { nanoid } from "nanoid";
+import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 
 export const maxDuration = 30;
 
@@ -18,6 +13,7 @@ export async function POST(req: Request) {
             headers: { "Content-Type": "application/json" },
         });
     }
+
 
     const { messages } = await req.json();
 

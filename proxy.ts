@@ -16,5 +16,6 @@ export const config = {
         "/",
         "/chat/:path*",
         "/quiz/:path*",
+        "/quizzes/:path*",
     ],
 };

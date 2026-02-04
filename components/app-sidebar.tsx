@@ -14,24 +14,21 @@ import {
     SidebarRail,
 } from "@/components/ui/sidebar"
 import { GraduationCap } from "lucide-react"
-import { usePathname, useRouter } from "next/navigation"
-import { useQuiz } from "@/hooks/use-quiz"
-import { useQuizzes } from "@/hooks/queries/use-quiz"
-import { Quiz } from "@/types"
+import { useRouter } from "next/navigation"
 import { Button } from "./ui/button"
 
 
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
-    const { data: quizzes } = useQuizzes()
-    const { setQuiz } = useQuiz()
-    const pathname = usePathname()
+    // const { data: quizzes } = useQuizzes()
+    // const { setQuiz } = useQuiz()
+    // const pathname = usePathname()
     const router = useRouter()
 
-    const handleClick = (quiz: Quiz) => {
-        setQuiz(quiz)
-        router.push(`/quiz/${quiz.id}`)
-    }
+    // const handleClick = (quiz: Quiz) => {
+    //     setQuiz(quiz)
+    //     router.push(`/quiz/${quiz.id}`)
+    // }
 
     return (
         <Sidebar {...props}>
@@ -49,13 +46,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 <SidebarGroup>
                     <SidebarGroupContent>
                         <SidebarMenu>
-                            {quizzes?.map((quiz) => (
+                            {/* {quizzes?.map((quiz) => (
                                 <SidebarMenuItem key={quiz.id}>
                                     <SidebarMenuButton isActive={pathname === `/quiz/${quiz.id}`} onClick={() => handleClick(quiz)}>
                                         <span>{quiz.title}</span>
                                     </SidebarMenuButton>
                                 </SidebarMenuItem>
-                            ))}
+                            ))} */}
                         </SidebarMenu>
                     </SidebarGroupContent>
                 </SidebarGroup>
