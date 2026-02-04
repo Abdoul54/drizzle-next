@@ -7,3 +7,12 @@ export const createQuizSchema = z.object({
 });
 
 export type CreateQuizForm = z.infer<typeof createQuizSchema>;
+
+
+export const updateQuizSchema = z.object({
+    title: z.string().min(1).optional(),
+    description: z.string().max(225).nullable().optional(),
+    status: z.enum(["draft", "published", "unpublished"]).optional(),
+});
+
+export type UpdateQuizForm = z.infer<typeof updateQuizSchema>;
