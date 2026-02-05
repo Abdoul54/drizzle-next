@@ -28,8 +28,8 @@ import { useGetConversation } from '@/hooks/queries/use-conversation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
 import { ArrowLeft, GlobeIcon } from 'lucide-react';
-import { useParams, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useEffect, useRef, useState } from 'react';
 
 const PromptInputAttachmentsDisplay = () => {
     const attachments = usePromptInputAttachments();
@@ -57,10 +57,17 @@ const PromptInputAttachmentsDisplay = () => {
 export default function Page() {
     const { id } = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
 
     const [webSearch, setWebSearch] = useState(false);
     const [input, setInput] = useState('');
     const [activeTool, setActiveTool] = useState<string | null>(null);
+
+    // Track if we've sent the initial message
+    const initialMessageSentRef = useRef(false);
+
+    // Get initial message from URL search params
+    const initialMessage = searchParams.get('initialMessage');
 
     // Fetch conversation with messages and quiz data
     const { data: conversation, error, isLoading } = useGetConversation(id as string);
@@ -74,7 +81,7 @@ export default function Page() {
     const { messages, sendMessage, status } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
-            api: '/api/chat',
+            api: '/api/v2/chat',
             body: { conversationId, quizId }
         }),
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
@@ -87,6 +94,27 @@ export default function Page() {
             setActiveTool(null);
         },
     });
+
+    // Auto-send initial message from URL params
+    useEffect(() => {
+        if (
+            !isLoading &&
+            !error &&
+            conversationId &&
+            initialMessage &&
+            !initialMessageSentRef.current &&
+            messages.length === 0 // Only send if no messages yet
+        ) {
+            initialMessageSentRef.current = true;
+
+            // Decode and send the initial message
+            const decodedMessage = decodeURIComponent(initialMessage);
+            sendMessage({ text: decodedMessage });
+
+            // Clean up URL by removing the search param (optional, for cleaner URL)
+            router.replace(`/conversations/${id}`, { scroll: false });
+        }
+    }, [isLoading, error, conversationId, initialMessage, messages.length, sendMessage, router, id]);
 
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim()) {
@@ -153,11 +181,7 @@ export default function Page() {
                                                     <Reasoning
                                                         key={`${message.id}-${i}`}
                                                         className="w-full"
-                                                        isStreaming={
-                                                            status === 'streaming' &&
-                                                            i === message.parts!.length - 1 &&
-                                                            message.id === messages.at(-1)?.id
-                                                        }
+                                                        isStreaming={status === 'streaming' && i === message.parts!.length - 1 && message.id === messages.at(-1)?.id}
                                                     >
                                                         <ReasoningTrigger />
                                                         <ReasoningContent>{part.text}</ReasoningContent>
@@ -169,13 +193,11 @@ export default function Page() {
                                     })}
                                 </div>
                             ))}
-
-                            {/* Loading states */}
                             {status === 'submitted' && <Shimmer>Thinking...</Shimmer>}
                             {status === 'streaming' && activeTool && (
-                                <Shimmer>{`Using ${activeTool}...`}</Shimmer>
+                                <Shimmer>Using Tools...</Shimmer>
                             )}
-                            {status === 'streaming' && !activeTool && messages.at(-1)?.role === 'user' && (
+                            {status === 'streaming' && !activeTool && (
                                 <Shimmer>Generating...</Shimmer>
                             )}
                         </ConversationContent>
@@ -184,7 +206,7 @@ export default function Page() {
                 </Conversation>
 
                 {/* Input Area */}
-                <PromptInput onSubmit={handleSubmit} className="px-4 pb-4" globalDrop multiple>
+                <PromptInput onSubmit={handleSubmit} className="px-4" globalDrop multiple>
                     <PromptInputHeader>
                         <PromptInputAttachmentsDisplay />
                     </PromptInputHeader>
@@ -193,7 +215,6 @@ export default function Page() {
                             onChange={(e) => setInput(e.target.value)}
                             value={input}
                             disabled={isLoading || !!error}
-                            placeholder="Type your message..."
                         />
                     </PromptInputBody>
                     <PromptInputFooter>

@@ -25,24 +25,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     // const pathname = usePathname()
     const router = useRouter()
 
-    // const handleClick = (quiz: Quiz) => {
-    //     setQuiz(quiz)
-    //     router.push(`/quiz/${quiz.id}`)
-    // }
-
     return (
         <Sidebar {...props}>
             <SidebarHeader>
                 <div className="flex justify-center items-center gap-2 font-bold text-xl py-1"><GraduationCap />Quizzes</div>
             </SidebarHeader>
             <SidebarContent>
-                <SidebarGroup>
-                    <SidebarGroupContent>
-                        <SidebarMenu>
-                            <Button onClick={() => router.push("/quiz")}>New Quiz</Button>
-                        </SidebarMenu>
-                    </SidebarGroupContent>
-                </SidebarGroup>
                 <SidebarGroup>
                     <SidebarGroupContent>
                         <SidebarMenu>

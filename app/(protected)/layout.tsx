@@ -12,7 +12,7 @@ export default function layout({
     return (
         <SidebarProvider defaultOpen={false}>
             <QuizProvider>
-                <AppSidebar />
+                {/* <AppSidebar /> */}
                 <SidebarInset>
                     <AppHeader />
                     <div className="flex flex-1 flex-col gap-4 p-4">

@@ -36,24 +36,20 @@ const Page = () => {
     const IconComponent = status ? QuizStatuses[status]?.icon : null
     const variant = (status ? (QuizStatuses[status]?.badge as "success" | "destructive" | "outline") : null) || "ghost"
 
-    // Handle sending a message - creates conversation and redirects
+    // Handle sending a message - creates conversation and redirects with initial message
     const handleSubmit = async (message: PromptInputMessage) => {
         if (!message.text?.trim() || sending) return
 
         setSending(true)
         try {
-            // Create conversation with the initial message
-            const newConversation = await createConversation.mutateAsync({
-                message: {
-                    text: message.text,
-                }
-            })
+            // Create conversation (pass empty object to satisfy TypeScript)
+            const newConversation = await createConversation.mutateAsync({})
 
-            // Redirect to the conversation page
-            router.push(`/conversations/${newConversation.id}`)
+            // Encode the message and redirect with it as a search param
+            const encodedMessage = encodeURIComponent(message.text)
+            router.push(`/conversations/${newConversation.id}?initialMessage=${encodedMessage}`)
         } catch (err) {
             console.error('Failed to create conversation:', err)
-        } finally {
             setSending(false)
         }
     }
@@ -89,72 +85,65 @@ const Page = () => {
             <div className="w-full px-4">
                 {/* Header */}
                 {!isLoading ? (
-                    <div className="flex justify-between gap-4 w-full mb-6">
-                        <div className="flex flex-col flex-1 min-w-0">
-                            <h1 className="text-3xl font-bold text-gray-900 mb-2 truncate">
-                                {quiz?.title}
-                            </h1>
-                            <p className="text-gray-700 line-clamp-3">
-                                {quiz?.description}
-                            </p>
+                    <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center gap-3">
+                            <h1 className="text-2xl font-bold">{quiz?.title}</h1>
+                            {status && IconComponent && (
+                                <Badge variant={variant}>
+                                    <IconComponent className="mr-1 h-3 w-3" />
+                                    {label}
+                                </Badge>
+                            )}
                         </div>
-
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2">
                             <EditQuizDialog quiz={quiz} />
-                            <Badge variant={variant} className="text-base py-1 flex items-center gap-1">
-                                {IconComponent && <IconComponent className="w-4 h-4" />}
-                                {label}
-                            </Badge>
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
                                     <Button variant="outline" size="icon">
-                                        <EllipsisVertical />
+                                        <EllipsisVertical className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                    {status !== 'published' && (
+                                    {status === 'draft' && (
                                         <DropdownMenuItem onClick={handlePublish}>
-                                            <QuizStatuses.published.icon className="mr-2 h-4 w-4 stroke-success" />
+                                            <Plus className="mr-2 h-4 w-4" />
                                             Publish
                                         </DropdownMenuItem>
                                     )}
                                     {status === 'published' && (
                                         <DropdownMenuItem onClick={handleUnpublish}>
-                                            <QuizStatuses.unpublished.icon className="mr-2 h-4 w-4 stroke-destructive" />
                                             Unpublish
                                         </DropdownMenuItem>
                                     )}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem className="text-destructive">
                                         <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete Quiz
+                                        Delete
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </div>
                     </div>
                 ) : (
-                    <div className="flex justify-between gap-4 w-full mb-6">
-                        <div className="flex flex-col flex-1 min-w-0 gap-2">
-                            <Skeleton className="h-8 w-1/3" />
-                            <Skeleton className="h-4 w-1/2" />
-                        </div>
-                        <div className="flex items-center gap-2 shrink-0">
-                            <Skeleton className="h-9 w-9" />
-                            <Skeleton className="h-9 w-20" />
-                            <Skeleton className="h-9 w-9" />
-                        </div>
+                    <div className="flex items-center justify-between mb-6">
+                        <Skeleton className="h-8 w-48" />
+                        <Skeleton className="h-10 w-24" />
                     </div>
+                )}
+
+                {/* Description */}
+                {quiz?.description && (
+                    <p className="text-muted-foreground mb-6">{quiz.description}</p>
                 )}
 
                 {/* Main Content */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Chat Input Section */}
+                    {/* Left Column - Chat Input & Conversations */}
                     <div className="lg:col-span-2 space-y-4">
+                        {/* Start Conversation Card */}
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <MessageSquare className="h-5 w-5" />
+                                <CardTitle className="text-lg">
                                     Start a Conversation
                                 </CardTitle>
                                 <CardDescription>
