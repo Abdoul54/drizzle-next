@@ -66,6 +66,7 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
             });
             if (fileInputRef.current) fileInputRef.current.value = "";
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             toast.error("Upload failed", {
                 description: error.response?.data?.message || "An error occurred",
@@ -84,6 +85,7 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
                 description: "Attachment removed successfully"
             });
         },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onError: (error: any) => {
             toast.error("Delete failed", {
                 description: error.response?.data?.message || "An error occurred",

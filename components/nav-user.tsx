@@ -51,10 +51,8 @@ export function NavUser({
     const router = useRouter()
 
     const initials = user?.name
-        ?.trim()
-        .split(/\s+/)
-        .map(n => n[0].toUpperCase())
-        .join("");
+        ? user.name.trim().split(/\s+/).map(n => n[0]).join("")
+        : "?"
 
     const { bg, text } = getAvatarColors(user?.name || "");
 

@@ -1,7 +1,9 @@
+// app/api/v1/chat/route.ts (UPDATED VERSION)
 import { getCurrentUser } from "@/lib/auth-session";
 import { openai } from '@ai-sdk/openai';
 import { streamText, convertToModelMessages, stepCountIs } from 'ai';
 import { buildRagContext } from '@/lib/rag';
+import { convertTextFilesToContent } from '@/lib/message-converter'; // NEW IMPORT
 
 export const maxDuration = 30;
 
@@ -17,20 +19,13 @@ export async function POST(req: Request) {
 
     const { messages, conversationId, quizId } = await req.json();
 
-    const latestUserMessage = messages
+    // STEP 1: Convert text files to text content BEFORE processing
+    const processedMessages = await convertTextFilesToContent(messages);
+
+    const latestUserMessage = processedMessages
         .slice()
         .reverse()
         .find((message: { role: string }) => message.role === "user");
-
-    // Log the actual message structure
-    console.log('📨 Latest user message structure:', {
-        hasMessage: !!latestUserMessage,
-        keys: latestUserMessage ? Object.keys(latestUserMessage) : [],
-        hasParts: latestUserMessage?.parts ? true : false,
-        hasContent: latestUserMessage?.content !== undefined,
-        parts: latestUserMessage?.parts,
-        content: latestUserMessage?.content,
-    });
 
     // Extract query text - messages use parts array, not content field
     let queryText = "";
@@ -70,13 +65,6 @@ export async function POST(req: Request) {
             : typeof quizId === 'string'
                 ? Number(quizId)
                 : undefined;
-
-    console.log('📊 IDs parsed:', {
-        quizId: parsedQuizId,
-        conversationId: parsedConversationId,
-        hasQuizId: !!parsedQuizId,
-        hasConversationId: !!parsedConversationId,
-    });
 
     const { context: contextBlock } = queryText
         ? await buildRagContext({
@@ -119,7 +107,8 @@ ${contextBlock}
 - You can use the web_search tool for information NOT in the uploaded documents.
 - Be specific when referencing document content - mention page numbers, sections, or key points from the context.
 `,
-        messages: await convertToModelMessages(messages),
+        // Use processed messages with text files converted
+        messages: await convertToModelMessages(processedMessages),
         tools: {
             web_search: openai.tools.webSearch({
                 externalWebAccess: true,

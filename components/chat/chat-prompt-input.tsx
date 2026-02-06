@@ -21,7 +21,8 @@ import { PromptAttachmentsDisplay } from './prompt-attachments-display';
 import type { ChatStatus } from 'ai';
 
 // File types supported by OpenAI
-const ACCEPTED_FILE_TYPES = 'application/pdf,image/jpeg,image/png,image/gif,image/webp,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+const ACCEPTED_FILE_TYPES = 'application/pdf,application/x-pdf,application/acrobat,application/vnd.pdf,text/pdf,text/x-pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword,application/vnd.ms-word,application/doc,application/ms-doc,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/msexcel,application/x-msexcel,application/x-ms-excel,application/x-excel,application/x-dos_ms_excel,application/xls,text/csv,text/comma-separated-values,application/csv,application/x-csv,text/x-csv,text/x-comma-separated-values,text/plain,text/txt,application/txt,application/text,'
+
 
 interface ChatPromptInputProps {
     onSubmit: (message: PromptInputMessage) => void;
