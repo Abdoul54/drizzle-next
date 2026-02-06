@@ -1,6 +1,20 @@
+/* eslint-disable @next/next/no-img-element */
+// app/(protected)/conversations/[id]/page.tsx
 'use client';
 
-import { Attachment, AttachmentPreview, AttachmentRemove, Attachments } from '@/components/ai-elements/attachments';
+import {
+    Attachment,
+    AttachmentData,
+    AttachmentHoverCard,
+    AttachmentHoverCardContent,
+    AttachmentHoverCardTrigger,
+    AttachmentInfo,
+    AttachmentPreview,
+    AttachmentRemove,
+    Attachments,
+    getAttachmentLabel,
+    getMediaCategory,
+} from '@/components/ai-elements/attachments';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import {
@@ -23,6 +37,7 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-e
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import ChatError from '@/components/chat-error';
 import ChatSkeleton from '@/components/chat-skeleton';
+import { ChatPromptInput } from '@/components/chat/chat-prompt-input';
 import { Button } from '@/components/ui/button';
 import { useGetConversation } from '@/hooks/queries/use-conversation';
 import { useChat } from '@ai-sdk/react';
@@ -31,6 +46,7 @@ import { ArrowLeft, GlobeIcon } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
+// Component to display attachments in the prompt input
 const PromptInputAttachmentsDisplay = () => {
     const attachments = usePromptInputAttachments();
 
@@ -54,6 +70,65 @@ const PromptInputAttachmentsDisplay = () => {
     );
 };
 
+// Component to render file attachments in messages
+const MessageAttachments = ({ attachments }: { attachments: AttachmentData[] }) => {
+    if (!attachments || attachments.length === 0) return null;
+
+    console.log({ attachments });
+
+    return (
+        <Attachments variant="inline">
+            {attachments?.map((attachment, index) => {
+                const mediaCategory = getMediaCategory(attachment);
+                const label = getAttachmentLabel(attachment);
+
+                return (
+                    <AttachmentHoverCard key={index}>
+                        <AttachmentHoverCardTrigger asChild>
+                            <Attachment data={attachment}>
+                                <div className="relative size-5 shrink-0">
+                                    <div className="absolute inset-0 transition-opacity group-hover:opacity-0">
+                                        <AttachmentPreview />
+                                    </div>
+                                </div>
+                                <AttachmentInfo />
+                            </Attachment>
+                        </AttachmentHoverCardTrigger>
+                        <AttachmentHoverCardContent>
+                            <div className="space-y-3">
+                                {mediaCategory === 'image' &&
+                                    attachment.type === 'file' &&
+                                    attachment.url && (
+                                        <div className="flex max-h-96 w-80 items-center justify-center overflow-hidden rounded-md border">
+                                            <img
+                                                alt={label}
+                                                className="max-h-full max-w-full object-contain"
+                                                height={384}
+                                                src={attachment.url}
+                                                width={320}
+                                            />
+                                        </div>
+                                    )}
+                                <div className="space-y-1 px-0.5">
+                                    <h4 className="font-semibold text-sm leading-none">
+                                        {label}
+                                    </h4>
+                                    {attachment.mediaType && (
+                                        <p className="font-mono text-muted-foreground text-xs">
+                                            {attachment.mediaType}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                        </AttachmentHoverCardContent>
+                    </AttachmentHoverCard>
+                );
+            })}
+        </Attachments>
+
+    );
+};
+
 export default function Page() {
     const { id } = useParams();
     const router = useRouter();
@@ -61,13 +136,12 @@ export default function Page() {
 
     const [webSearch, setWebSearch] = useState(false);
     const [input, setInput] = useState('');
-    const [activeTool, setActiveTool] = useState<string | null>(null);
 
-    // Track if we've sent the initial message
-    const initialMessageSentRef = useRef(false);
+    // Track if we've triggered the initial AI response
+    const hasTriggeredInitialResponse = useRef(false);
 
-    // Get initial message from URL search params
-    const initialMessage = searchParams.get('initialMessage');
+    // Check if this is a new conversation that needs AI response
+    const needsResponse = searchParams.get('new') === 'true';
 
     // Fetch conversation with messages and quiz data
     const { data: conversation, error, isLoading } = useGetConversation(id as string);
@@ -77,47 +151,43 @@ export default function Page() {
     const quizData = conversation?.quiz;
     const initialMessages = conversation?.messages ?? [];
 
-    // Setup AI chat
-    const { messages, sendMessage, status } = useChat({
+    // Setup AI chat with initial messages from DB
+    const { messages, sendMessage, status, regenerate, stop } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
             api: '/api/v2/chat',
             body: { conversationId, quizId }
         }),
+        // Pass initial messages - they already have the correct UIMessage format
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
-
-        onToolCall({ toolCall }) {
-            setActiveTool(toolCall.toolName);
-        },
-
-        onFinish() {
-            setActiveTool(null);
-        },
     });
 
-    // Auto-send initial message from URL params
+    // Trigger AI response for new conversations with initial message
     useEffect(() => {
         if (
             !isLoading &&
             !error &&
             conversationId &&
-            initialMessage &&
-            !initialMessageSentRef.current &&
-            messages.length === 0 // Only send if no messages yet
+            needsResponse &&
+            !hasTriggeredInitialResponse.current &&
+            initialMessages.length > 0 &&
+            messages.length > 0 &&
+            status === 'ready'
         ) {
-            initialMessageSentRef.current = true;
+            hasTriggeredInitialResponse.current = true;
 
-            // Decode and send the initial message
-            const decodedMessage = decodeURIComponent(initialMessage);
-            sendMessage({ text: decodedMessage });
-
-            // Clean up URL by removing the search param (optional, for cleaner URL)
-            router.replace(`/conversations/${id}`, { scroll: false });
+            // Check if the last message is from user (needs AI response)
+            const lastMessage = messages[messages.length - 1];
+            if (lastMessage?.role === 'user') {
+                regenerate()
+                // Clean up URL
+                router.replace(`/conversations/${id}`, { scroll: false });
+            }
         }
-    }, [isLoading, error, conversationId, initialMessage, messages.length, sendMessage, router, id]);
+    }, [isLoading, error, conversationId, needsResponse, initialMessages.length, messages, regenerate, status, router, id]);
 
     const handleSubmit = (message: PromptInputMessage) => {
-        if (message.text?.trim()) {
+        if (message.text?.trim() || (message.files && message.files.length > 0)) {
             sendMessage({ text: message.text, files: message.files });
             setInput('');
         }
@@ -130,6 +200,15 @@ export default function Page() {
         } else {
             router.back();
         }
+    };
+
+    // Extract file parts from message parts
+    const getFileParts = (parts: unknown[]) => {
+        if (!parts) return [];
+        return parts.filter((part: unknown) => {
+            const p = part as { type?: string };
+            return p.type === 'file';
+        }) as Array<{ type: string; url: string; mediaType: string; filename: string }>;
     };
 
     return (
@@ -162,43 +241,67 @@ export default function Page() {
                         <ChatError error={error?.message} />
                     ) : (
                         <ConversationContent>
-                            {messages.map((message) => (
-                                <div key={message.id}>
-                                    {message.parts?.map((part, i) => {
-                                        switch (part.type) {
-                                            case 'text':
-                                                return (
-                                                    <Message key={`${message.id}-${i}`} from={message.role}>
-                                                        <MessageContent>
-                                                            <MessageResponse>
-                                                                {part.text}
-                                                            </MessageResponse>
-                                                        </MessageContent>
-                                                    </Message>
-                                                );
-                                            case 'reasoning':
-                                                return (
-                                                    <Reasoning
-                                                        key={`${message.id}-${i}`}
-                                                        className="w-full"
-                                                        isStreaming={status === 'streaming' && i === message.parts!.length - 1 && message.id === messages.at(-1)?.id}
-                                                    >
-                                                        <ReasoningTrigger />
-                                                        <ReasoningContent>{part.text}</ReasoningContent>
-                                                    </Reasoning>
-                                                );
-                                            default:
-                                                return null;
-                                        }
-                                    })}
-                                </div>
-                            ))}
-                            {status === 'submitted' && <Shimmer>Thinking...</Shimmer>}
-                            {status === 'streaming' && activeTool && (
-                                <Shimmer>Using Tools...</Shimmer>
-                            )}
-                            {status === 'streaming' && !activeTool && (
-                                <Shimmer>Generating...</Shimmer>
+                            {messages.map((message) => {
+                                const fileParts = getFileParts(message.parts as unknown[]);
+                                const hasFiles = fileParts.length > 0;
+
+                                return (
+                                    <div key={message.id}>
+                                        {/* Render file attachments first (for user messages) */}
+                                        {message.role === 'user' && hasFiles && (
+                                            <Message from={message.role}>
+                                                <MessageContent className='p-0 !bg-transparent'>
+                                                    <MessageAttachments attachments={fileParts as AttachmentData[]} />
+                                                </MessageContent>
+                                            </Message>
+                                        )}
+
+                                        {/* Render other parts */}
+                                        {message.parts?.map((part, i) => {
+                                            switch (part.type) {
+                                                case 'text':
+                                                    return (
+                                                        <Message key={`${message.id}-${i}`} from={message.role}>
+                                                            <MessageContent>
+                                                                <MessageResponse>
+                                                                    {part.text}
+                                                                </MessageResponse>
+                                                            </MessageContent>
+                                                        </Message>
+                                                    );
+                                                case 'reasoning':
+                                                    return (
+                                                        <Reasoning
+                                                            key={`${message.id}-${i}`}
+                                                            className="w-full"
+                                                            isStreaming={
+                                                                status === 'streaming' &&
+                                                                i === message.parts!.length - 1 &&
+                                                                message.id === messages.at(-1)?.id
+                                                            }
+                                                        >
+                                                            <ReasoningTrigger />
+                                                            <ReasoningContent>{part.text}</ReasoningContent>
+                                                        </Reasoning>
+                                                    );
+                                                case 'file':
+                                                    // Files are rendered separately above
+                                                    return null;
+                                                default:
+                                                    return null;
+                                            }
+                                        })}
+                                    </div>
+                                );
+                            })}
+
+                            {/* Streaming indicator */}
+                            {status === 'streaming' && messages.at(-1)?.role !== 'assistant' && (
+                                <Message from="assistant">
+                                    <MessageContent>
+                                        <Shimmer className="h-4 w-32" >Streaming</Shimmer>
+                                    </MessageContent>
+                                </Message>
                             )}
                         </ConversationContent>
                     )}
@@ -206,38 +309,14 @@ export default function Page() {
                 </Conversation>
 
                 {/* Input Area */}
-                <PromptInput onSubmit={handleSubmit} className="px-4" globalDrop multiple>
-                    <PromptInputHeader>
-                        <PromptInputAttachmentsDisplay />
-                    </PromptInputHeader>
-                    <PromptInputBody>
-                        <PromptInputTextarea
-                            onChange={(e) => setInput(e.target.value)}
-                            value={input}
-                            disabled={isLoading || !!error}
-                        />
-                    </PromptInputBody>
-                    <PromptInputFooter>
-                        <PromptInputTools>
-                            <PromptInputActionMenu>
-                                <PromptInputActionMenuTrigger disabled={isLoading || !!error} />
-                                <PromptInputActionMenuContent>
-                                    <PromptInputActionAddAttachments disabled={isLoading || !!error} />
-                                </PromptInputActionMenuContent>
-                            </PromptInputActionMenu>
-                            <PromptInputButton
-                                type="button"
-                                variant={webSearch ? 'default' : 'ghost'}
-                                onClick={() => setWebSearch(!webSearch)}
-                                disabled={isLoading || !!error}
-                            >
-                                <GlobeIcon size={16} />
-                                <span>Search</span>
-                            </PromptInputButton>
-                        </PromptInputTools>
-                        <PromptInputSubmit disabled={!input.trim() || status === 'streaming'} />
-                    </PromptInputFooter>
-                </PromptInput>
+                <div className="p-4 border-t">
+                    <ChatPromptInput
+                        onSubmit={handleSubmit}
+                        onStop={stop}
+                        status={status}
+                        placeholder="Describe what kind of quiz you want to create..."
+                    />
+                </div>
             </div>
         </div>
     );

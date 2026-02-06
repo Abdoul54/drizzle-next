@@ -1,3 +1,4 @@
+import { UIMessagePart } from "ai";
 import { relations } from "drizzle-orm";
 import {
     pgTable,
@@ -178,14 +179,34 @@ export const conversation = pgTable("conversation", {
         .$onUpdate(() => new Date()),
 });
 
+// db/schema.ts
 export const message = pgTable("message", {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
+    id: text("id").primaryKey(),
     conversationId: bigint("conversation_id", { mode: "number" })
         .notNull()
         .references(() => conversation.id, { onDelete: "cascade" }),
     role: varchar("role", { length: 255 }).notNull(),
-    metadata: jsonb("metadata").notNull(),
-    parts: jsonb("parts").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+    parts: jsonb("parts").notNull(),  // Type assertion happens at query time
+    createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
+});
+
+// =============================================
+// ATTACHMENT TABLE
+// =============================================
+
+export const attachment = pgTable("attachment", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    conversationId: bigint("conversation_id", { mode: "number" })
+        .notNull()
+        .references(() => conversation.id, { onDelete: "cascade" }),
+    messageId: text("message_id")  // Changed from bigint
+        .references(() => message.id, { onDelete: "cascade" }),
+    filename: varchar("filename", { length: 255 }).notNull(),
+    url: text("url").notNull(),
+    content: text("content"),
+    mediaType: varchar("media_type", { length: 100 }).notNull(),
+    size: integer("size"),
     createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
 });
 
@@ -251,6 +272,18 @@ export const answerRelations = relations(answer, ({ one }) => ({
     }),
 }));
 
+export const attachmentRelations = relations(attachment, ({ one }) => ({
+    conversation: one(conversation, {
+        fields: [attachment.conversationId],
+        references: [conversation.id],
+    }),
+    message: one(message, {
+        fields: [attachment.messageId],
+        references: [message.id],
+    }),
+}));
+
+
 export const conversationRelations = relations(conversation, ({ one, many }) => ({
     user: one(user, {
         fields: [conversation.userId],
@@ -261,11 +294,13 @@ export const conversationRelations = relations(conversation, ({ one, many }) => 
         references: [quiz.id],
     }),
     messages: many(message),
+    attachments: many(attachment),
 }));
 
-export const messageRelations = relations(message, ({ one }) => ({
+export const messageRelations = relations(message, ({ one, many }) => ({
     conversation: one(conversation, {
         fields: [message.conversationId],
         references: [conversation.id],
     }),
+    attachments: many(attachment),
 }));

@@ -1,3 +1,5 @@
+// hooks/queries/use-conversation.ts
+
 import { axiosInstance } from "@/lib/axios";
 import {
     useMutation,
@@ -65,10 +67,8 @@ export const useGetConversations = (quizId: number | string) => {
 ======================= */
 
 type CreateConversationInput = {
-    message?: {
-        text: string;
-        files?: File[];
-    };
+    text?: string;
+    files?: File[];
 };
 
 export const useCreateConversation = (quizId: number | string) => {
@@ -77,9 +77,34 @@ export const useCreateConversation = (quizId: number | string) => {
 
     return useMutation({
         mutationFn: async (payload?: CreateConversationInput) => {
+            // If we have files, use FormData
+            if (payload?.files && payload.files.length > 0) {
+                const formData = new FormData();
+
+                if (payload.text) {
+                    formData.append("text", payload.text);
+                }
+
+                for (const file of payload.files) {
+                    formData.append("files", file);
+                }
+
+                const { data } = await axiosInstance.post(
+                    `/api/v1/quizzes/${normalizedId}/conversations`,
+                    formData,
+                    {
+                        headers: {
+                            "Content-Type": "multipart/form-data",
+                        },
+                    }
+                );
+                return data;
+            }
+
+            // Otherwise, use JSON
             const { data } = await axiosInstance.post(
                 `/api/v1/quizzes/${normalizedId}/conversations`,
-                payload
+                payload?.text ? { text: payload.text } : {}
             );
             return data;
         },

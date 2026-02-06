@@ -18,24 +18,31 @@ import {
 import { GlobeIcon } from 'lucide-react';
 import { useState } from 'react';
 import { PromptAttachmentsDisplay } from './prompt-attachments-display';
+import type { ChatStatus } from 'ai';
 
+// File types supported by OpenAI
+const ACCEPTED_FILE_TYPES = 'application/pdf,image/jpeg,image/png,image/gif,image/webp,application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
 interface ChatPromptInputProps {
     onSubmit: (message: PromptInputMessage) => void;
-    disabled?: boolean;
+    onStop: () => void;
+    placeholder?: string;
+    status?: ChatStatus;
     className?: string;
 }
 
 export const ChatPromptInput = ({
     onSubmit,
-    disabled = false,
+    onStop,
+    status,
+    placeholder,
     className,
 }: ChatPromptInputProps) => {
     const [input, setInput] = useState('');
     const [webSearch, setWebSearch] = useState(false);
 
     const handleSubmit = (message: PromptInputMessage) => {
-        if (message.text?.trim()) {
+        if (message.text?.trim() || (message.files && message.files.length > 0)) {
             onSubmit(message);
             setInput('');
         }
@@ -47,6 +54,7 @@ export const ChatPromptInput = ({
             className={className}
             globalDrop
             multiple
+            accept={ACCEPTED_FILE_TYPES}
         >
             <PromptInputHeader>
                 <PromptAttachmentsDisplay />
@@ -55,7 +63,7 @@ export const ChatPromptInput = ({
                 <PromptInputTextarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder='What quiz you want to make today'
+                    placeholder={placeholder || "What's on your mind today"}
                 />
             </PromptInputBody>
             <PromptInputFooter>
@@ -75,7 +83,7 @@ export const ChatPromptInput = ({
                         <span>Search</span>
                     </PromptInputButton>
                 </PromptInputTools>
-                <PromptInputSubmit disabled={disabled || !input.trim()} />
+                <PromptInputSubmit disabled={!input.trim() && status !== 'streaming'} onStop={onStop} status={status} />
             </PromptInputFooter>
         </PromptInput>
     );

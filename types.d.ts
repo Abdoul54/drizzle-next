@@ -119,6 +119,19 @@ export interface Message {
     createdAt: Date;
 }
 
+export interface Attachment {
+    id: number;
+    conversationId: number;
+    messageId: number | null;
+    filename: string;
+    url: string;
+    content: string | null;    // Extracted text content
+    mediaType: string;
+    size: number | null;
+    createdAt: Date;
+}
+
+
 // =============================================
 // INSERT TYPES (omit auto-generated fields)
 // =============================================
@@ -146,6 +159,8 @@ export type InsertAnswer = Omit<Answer, "id">;
 export type InsertConversation = Omit<Conversation, "id" | "createdAt" | "updatedAt">;
 
 export type InsertMessage = Omit<Message, "id" | "createdAt">;
+
+export type InsertAttachment = Omit<Attachment, "id" | "createdAt">;
 
 // =============================================
 // RELATIONS (for query results with joins)
@@ -192,8 +207,15 @@ export interface ConversationWithRelations extends Conversation {
     user?: User;
     quiz?: Quiz;
     messages?: Message[];
+    attachments?: Attachment[];
 }
 
 export interface MessageWithRelations extends Message {
     conversation?: Conversation;
+    attachments?: Attachment[];
+}
+
+export interface AttachmentWithRelations extends Attachment {
+    conversation?: Conversation;
+    message?: Message;
 }

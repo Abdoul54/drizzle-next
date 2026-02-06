@@ -1,6 +1,6 @@
 // lib/tools.ts
 import { db } from '@/db';
-import { attachments, conversations, quizzes } from '@/db/schema';
+import { answer, attachment, conversation, option, question, quiz } from '@/db/schema';
 import { tool } from 'ai';
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
@@ -11,15 +11,19 @@ export const retrieveAttachmentsTool = tool({
         quizId: z.string(),
     }),
     execute: async ({ quizId }) => {
+        const quizIdNumber = Number(quizId);
+        if (Number.isNaN(quizIdNumber)) {
+            return [];
+        }
         const rows = await db
             .select({
-                content: attachments.content,
-                filename: attachments.filename,
+                content: attachment.content,
+                filename: attachment.filename,
             })
-            .from(quizzes)
-            .innerJoin(conversations, eq(conversations.quizId, quizzes.id))
-            .innerJoin(attachments, eq(attachments.conversationId, conversations.id))
-            .where(eq(quizzes.id, quizId));
+            .from(quiz)
+            .innerJoin(conversation, eq(conversation.quizId, quiz.id))
+            .innerJoin(attachment, eq(attachment.conversationId, conversation.id))
+            .where(eq(quiz.id, quizIdNumber));
 
         return rows.filter(r => r.content !== null);
     },
@@ -78,6 +82,11 @@ export const saveQuizTool = tool({
     }),
     execute: async ({ quizId, questions }) => {
         try {
+            const quizIdNumber = Number(quizId);
+            if (Number.isNaN(quizIdNumber)) {
+                return { success: false, error: "Invalid quiz id" };
+            }
+
             let parsedQuestions;
 
             if (typeof questions === 'string') {
@@ -90,13 +99,79 @@ export const saveQuizTool = tool({
             // Validate each question against the schema
             const validatedQuestions = z.array(questionSchema).parse(parsedQuestions);
 
-            await db
-                .update(quizzes)
-                .set({
-                    data: { questions: validatedQuestions },
-                    status: 'draft',
-                })
-                .where(eq(quizzes.id, quizId));
+            for (const q of validatedQuestions) {
+                const mappedType =
+                    q.type === "multiple_choice"
+                        ? "choice"
+                        : q.type === "true_false"
+                            ? "true-false"
+                            : q.type === "fill_in_blank"
+                                ? "fill-in"
+                                : "long-fill-in";
+
+                const [questionRow] = await db
+                    .insert(question)
+                    .values({
+                        quizId: quizIdNumber,
+                        type: mappedType,
+                        media: null,
+                        text: q.question,
+                        subText:
+                            q.type === "fill_in_blank"
+                                ? q.correctAnswer
+                                : q.type === "short_answer"
+                                    ? q.correctAnswer ?? null
+                                    : null,
+                    })
+                    .returning({ id: question.id });
+
+                if (!questionRow?.id) {
+                    continue;
+                }
+
+                if (q.type === "multiple_choice") {
+                    const optionRows = await db
+                        .insert(option)
+                        .values(
+                            q.options.map((label) => ({
+                                questionId: questionRow.id,
+                                label,
+                            }))
+                        )
+                        .returning({ id: option.id, label: option.label });
+
+                    const correct =
+                        optionRows.find((row) => row.label === q.correctAnswer) ??
+                        optionRows[0];
+
+                    if (correct) {
+                        await db.insert(answer).values({
+                            questionId: questionRow.id,
+                            value: correct.id,
+                        });
+                    }
+                }
+
+                if (q.type === "true_false") {
+                    const optionRows = await db
+                        .insert(option)
+                        .values([
+                            { questionId: questionRow.id, label: "True" },
+                            { questionId: questionRow.id, label: "False" },
+                        ])
+                        .returning({ id: option.id, label: option.label });
+
+                    const correctLabel = q.correctAnswer ? "True" : "False";
+                    const correct = optionRows.find((row) => row.label === correctLabel);
+
+                    if (correct) {
+                        await db.insert(answer).values({
+                            questionId: questionRow.id,
+                            value: correct.id,
+                        });
+                    }
+                }
+            }
 
             return { success: true, questionCount: validatedQuestions.length };
         } catch (error) {

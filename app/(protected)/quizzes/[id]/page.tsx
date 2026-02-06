@@ -1,3 +1,4 @@
+// app/(protected)/quizzes/[id]/page.tsx
 'use client'
 
 import { PromptInputMessage } from "@/components/ai-elements/prompt-input"
@@ -36,20 +37,42 @@ const Page = () => {
     const IconComponent = status ? QuizStatuses[status]?.icon : null
     const variant = (status ? (QuizStatuses[status]?.badge as "success" | "destructive" | "outline") : null) || "ghost"
 
-    // Handle sending a message - creates conversation and redirects with initial message
+    // Handle sending a message - creates conversation with initial message + files
     const handleSubmit = async (message: PromptInputMessage) => {
-        if (!message.text?.trim() || sending) return
+        if ((!message.text?.trim() && (!message.files || message.files.length === 0)) || sending) return
 
         setSending(true)
         try {
-            // Create conversation (pass empty object to satisfy TypeScript)
-            const newConversation = await createConversation.mutateAsync({})
+            // Convert FileUIPart objects to File array
+            // FileUIPart has: { url: string (blob URL or data URL), mediaType: string, filename: string }
+            const files: File[] = [];
 
-            // Encode the message and redirect with it as a search param
-            const encodedMessage = encodeURIComponent(message.text)
-            router.push(`/conversations/${newConversation.id}?initialMessage=${encodedMessage}`)
+            if (message.files && message.files.length > 0) {
+                for (const filePart of message.files) {
+                    if (filePart.url) {
+                        // Fetch the blob from the blob URL
+                        const response = await fetch(filePart.url);
+                        const blob = await response.blob();
+                        // Create a File object from the blob
+                        const file = new File([blob], filePart.filename || 'file', {
+                            type: filePart.mediaType || blob.type,
+                        });
+                        files.push(file);
+                    }
+                }
+            }
+
+            // Create conversation with initial message and files
+            const newConversation = await createConversation.mutateAsync({
+                text: message.text || undefined,
+                files: files.length > 0 ? files : undefined,
+            })
+
+            // Redirect to conversation page (no need to pass message in URL anymore)
+            router.push(`/conversations/${newConversation.id}?new=true`)
         } catch (err) {
             console.error('Failed to create conversation:', err)
+        } finally {
             setSending(false)
         }
     }
@@ -147,25 +170,26 @@ const Page = () => {
                                     Start a Conversation
                                 </CardTitle>
                                 <CardDescription>
-                                    Send a message to start generating quiz questions with AI
+                                    Send a message to start generating quiz questions with AI.
+                                    You can also attach PDF, Word, or text files.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <ChatPromptInput
                                     onSubmit={handleSubmit}
-                                    disabled={sending || isLoading}
+                                    disabled={isLoading || sending}
+                                    placeholder="Describe what kind of quiz you want to create..."
                                 />
                             </CardContent>
                         </Card>
 
-                        {/* Previous Conversations */}
+                        {/* Existing Conversations */}
                         {conversations && conversations.length > 0 && (
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="text-lg">Previous Conversations</CardTitle>
-                                    <CardDescription>
-                                        Continue a previous conversation or start a new one
-                                    </CardDescription>
+                                    <CardTitle className="text-lg">
+                                        Previous Conversations
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
                                     {conversations.map((conv: Conversation) => (
@@ -176,7 +200,10 @@ const Page = () => {
                                             onClick={() => router.push(`/conversations/${conv.id}`)}
                                         >
                                             <MessageSquare className="mr-2 h-4 w-4" />
-                                            Conversation from {new Date(conv.createdAt).toLocaleDateString()}
+                                            Conversation #{conv.id}
+                                            <span className="ml-auto text-xs text-muted-foreground">
+                                                {new Date(conv.createdAt).toLocaleDateString()}
+                                            </span>
                                         </Button>
                                     ))}
                                 </CardContent>

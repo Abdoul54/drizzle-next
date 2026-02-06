@@ -22,6 +22,18 @@ CREATE TABLE "answer" (
 	"value" bigint NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "attachment" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"conversation_id" bigint NOT NULL,
+	"message_id" text,
+	"filename" varchar(255) NOT NULL,
+	"url" text NOT NULL,
+	"content" text,
+	"media_type" varchar(100) NOT NULL,
+	"size" integer,
+	"created_at" timestamp (0) DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "conversation" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
@@ -31,10 +43,10 @@ CREATE TABLE "conversation" (
 );
 --> statement-breakpoint
 CREATE TABLE "message" (
-	"id" bigserial PRIMARY KEY NOT NULL,
+	"id" text PRIMARY KEY NOT NULL,
 	"conversation_id" bigint NOT NULL,
 	"role" varchar(255) NOT NULL,
-	"metadata" jsonb NOT NULL,
+	"metadata" jsonb,
 	"parts" jsonb NOT NULL,
 	"created_at" timestamp (0) DEFAULT now() NOT NULL
 );
@@ -99,6 +111,8 @@ CREATE TABLE "verification" (
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "answer" ADD CONSTRAINT "answer_question_id_question_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."question"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "answer" ADD CONSTRAINT "answer_value_option_id_fk" FOREIGN KEY ("value") REFERENCES "public"."option"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "attachment" ADD CONSTRAINT "attachment_conversation_id_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "attachment" ADD CONSTRAINT "attachment_message_id_message_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."message"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation" ADD CONSTRAINT "conversation_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation" ADD CONSTRAINT "conversation_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message" ADD CONSTRAINT "message_conversation_id_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

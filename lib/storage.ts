@@ -1,104 +1,104 @@
 // lib/storage.ts
-import {
-    S3Client,
-    PutObjectCommand,
-    GetObjectCommand,
-    DeleteObjectCommand,
-    HeadObjectCommand,
-} from "@aws-sdk/client-s3";
+
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { nanoid } from "nanoid";
+import path from "path";
+import fs from "fs/promises";
 
-const s3Client = new S3Client({
-    region: "us-east-1",
-    endpoint: process.env.MINIO_ENDPOINT!,
-    credentials: {
-        accessKeyId: process.env.MINIO_ROOT_USER!,
-        secretAccessKey: process.env.MINIO_ROOT_PASSWORD!,
-    },
-    forcePathStyle: true,
-});
+// Toggle between local and S3 storage
+const USE_S3 = process.env.USE_S3 === "true";
 
-const BUCKET = process.env.MINIO_BUCKET!;
+// S3 Configuration
+const s3Client = USE_S3
+    ? new S3Client({
+        region: process.env.AWS_REGION || "us-east-1",
+        credentials: {
+            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
+        },
+    })
+    : null;
 
-export async function uploadFile(
-    key: string,
-    body: Buffer | Uint8Array | Blob,
-    contentType: string
-) {
-    await s3Client.send(
-        new PutObjectCommand({
-            Bucket: BUCKET,
-            Key: key,
-            Body: body,
-            ContentType: contentType,
-        })
-    );
+const S3_BUCKET = process.env.AWS_S3_BUCKET || "quizai-uploads";
 
-    return { key, url: getPublicUrl(key) };
-}
+// Local storage directory
+const LOCAL_UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
 
-export async function getPresignedUploadUrl(
-    key: string,
-    contentType: string,
-    expiresIn = 3600
-) {
-    const command = new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: key,
-        ContentType: contentType,
-    });
+/**
+ * Upload a file to storage (S3 or local filesystem)
+ */
+export async function uploadFile(file: File, folder: string = ""): Promise<string> {
+    const ext = path.extname(file.name);
+    const uniqueName = `${nanoid()}${ext}`;
+    const key = folder ? `${folder}/${uniqueName}` : uniqueName;
 
-    return getSignedUrl(s3Client, command, { expiresIn });
-}
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
 
-export async function getPresignedDownloadUrl(
-    key: string,
-    expiresIn = 3600
-) {
-    const command = new GetObjectCommand({
-        Bucket: BUCKET,
-        Key: key,
-    });
-
-    return getSignedUrl(s3Client, command, { expiresIn });
-}
-
-export async function deleteFile(key: string) {
-    await s3Client.send(
-        new DeleteObjectCommand({
-            Bucket: BUCKET,
-            Key: key,
-        })
-    );
-}
-
-export async function fileExists(key: string): Promise<boolean> {
-    try {
+    if (USE_S3 && s3Client) {
+        // Upload to S3
         await s3Client.send(
-            new HeadObjectCommand({
-                Bucket: BUCKET,
+            new PutObjectCommand({
+                Bucket: S3_BUCKET,
                 Key: key,
+                Body: buffer,
+                ContentType: file.type,
             })
         );
-        return true;
-    } catch {
-        return false;
+
+        // Return S3 URL
+        return `https://${S3_BUCKET}.s3.amazonaws.com/${key}`;
+    } else {
+        // Upload to local filesystem
+        const uploadDir = path.join(LOCAL_UPLOAD_DIR, folder);
+        await fs.mkdir(uploadDir, { recursive: true });
+
+        const filePath = path.join(uploadDir, uniqueName);
+        await fs.writeFile(filePath, buffer);
+
+        // Return local URL (relative path for API access)
+        return `/uploads/${key}`;
     }
 }
 
-// Public URL for files in the public/ prefix (anonymous download enabled)
-export function getPublicUrl(key: string) {
-    return `${process.env.MINIO_ENDPOINT}/${BUCKET}/${key}`;
+/**
+ * Get a signed URL for private file access (S3 only)
+ */
+export async function getSignedFileUrl(key: string, expiresIn: number = 3600): Promise<string> {
+    if (!USE_S3 || !s3Client) {
+        // For local files, return the direct path
+        return `/uploads/${key}`;
+    }
+
+    const command = new GetObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: key,
+    });
+
+    return await getSignedUrl(s3Client, command, { expiresIn });
 }
 
-// Helper to generate a unique key for attachments
-export function generateAttachmentKey(
-    conversationId: string,
-    filename: string,
-    isPublic = false
-) {
-    const timestamp = Date.now();
-    const sanitized = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
-    const prefix = isPublic ? "public" : "attachments";
-    return `${prefix}/${conversationId}/${timestamp}-${sanitized}`;
+/**
+ * Delete a file from storage
+ */
+export async function deleteFile(url: string): Promise<void> {
+    if (USE_S3 && s3Client) {
+        // Extract key from S3 URL
+        const key = url.replace(`https://${S3_BUCKET}.s3.amazonaws.com/`, "");
+
+        const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+        await s3Client.send(
+            new DeleteObjectCommand({
+                Bucket: S3_BUCKET,
+                Key: key,
+            })
+        );
+    } else {
+        // Delete from local filesystem
+        const filePath = path.join(LOCAL_UPLOAD_DIR, url.replace("/uploads/", ""));
+        await fs.unlink(filePath).catch(() => {
+            // Ignore if file doesn't exist
+        });
+    }
 }

@@ -64,7 +64,7 @@ export default function Page() {
     const { messages, sendMessage, status } = useChat({
         id: conversationId,
         transport: new DefaultChatTransport({
-            api: '/api/chat',
+            api: '/api/v1/chat',
             body: { conversationId, quizId: id }
         }),
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
