@@ -1,24 +1,33 @@
-// components/quiz-attachments.tsx
+// components/quiz-attachments-manager.tsx
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { axiosInstance } from "@/lib/axios";
-import { FileTextIcon, Loader2Icon, TrashIcon, UploadIcon, CheckCircleIcon, XCircleIcon, ClockIcon } from "lucide-react";
-import { useRef } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
+import {
+    FileTextIcon,
+    Loader2Icon,
+    TrashIcon,
+    UploadIcon,
+    FileIcon
+} from "lucide-react";
 
 interface Attachment {
     id: number;
-    filename: string;
-    mediaType: string;
-    size: number;
-    embeddingStatus: "pending" | "processing" | "completed" | "failed";
-    chunkCount: number;
-    errorMessage?: string;
+    quizId: number;
+    conversationId: number | null;
+    messageId?: string | null;
+    filename: string | null;
+    storageKey?: string | null;
+    url?: string | null;
+    mediaType?: string | null;
+    size?: number | null;
+    content: string | null;
     createdAt: string;
+    updatedAt: string;
 }
 
 interface QuizAttachmentsProps {
@@ -52,9 +61,8 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["quiz-attachments", quizId] });
-            toast.success(
-                "Upload successful", {
-                description: "Files are being processed..."
+            toast.success("Upload successful", {
+                description: "Files uploaded successfully"
             });
             if (fileInputRef.current) fileInputRef.current.value = "";
         },
@@ -72,11 +80,9 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["quiz-attachments", quizId] });
-            toast.success(
-                "Deleted", {
+            toast.success("Deleted", {
                 description: "Attachment removed successfully"
             });
-
         },
         onError: (error: any) => {
             toast.error("Delete failed", {
@@ -93,24 +99,22 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
     };
 
     const handleDelete = (attachmentId: number) => {
-        if (confirm("Delete this file?")) {
+        if (confirm("Delete this file? This action cannot be undone.")) {
             deleteMutation.mutate(attachmentId);
         }
     };
 
-    const getStatusIcon = (status: Attachment["embeddingStatus"]) => {
-        switch (status) {
-            case "completed": return <CheckCircleIcon className="h-4 w-4 text-green-500" />;
-            case "failed": return <XCircleIcon className="h-4 w-4 text-red-500" />;
-            case "processing": return <Loader2Icon className="h-4 w-4 animate-spin text-blue-500" />;
-            case "pending": return <ClockIcon className="h-4 w-4 text-gray-500" />;
-        }
-    };
+    const getFileIcon = (filename: string | null) => {
+        if (!filename) return <FileIcon className="h-4 w-4" />;
 
-    const formatFileSize = (bytes: number) => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        const ext = filename.toLowerCase();
+        if (ext.endsWith(".pdf")) return <FileTextIcon className="h-4 w-4 text-red-500" />;
+        if (ext.endsWith(".docx") || ext.endsWith(".doc"))
+            return <FileTextIcon className="h-4 w-4 text-blue-500" />;
+        if (ext.endsWith(".txt") || ext.endsWith(".md"))
+            return <FileTextIcon className="h-4 w-4 text-gray-500" />;
+
+        return <FileIcon className="h-4 w-4" />;
     };
 
     return (
@@ -118,19 +122,26 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
             <CardHeader>
                 <div className="flex items-center justify-between">
                     <div>
-                        <CardTitle>Quiz Knowledge Base</CardTitle>
-                        <CardDescription>
-                            Upload reference materials (PDFs, Word docs, text files)
+                        <CardTitle className="text-lg">Knowledge Base</CardTitle>
+                        <CardDescription className="text-xs">
+                            Upload reference materials for quiz generation
                         </CardDescription>
                     </div>
                     <Button
+                        size="sm"
                         onClick={() => fileInputRef.current?.click()}
                         disabled={uploadMutation.isPending}
                     >
                         {uploadMutation.isPending ? (
-                            <><Loader2Icon className="mr-2 h-4 w-4 animate-spin" />Uploading...</>
+                            <>
+                                <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading...
+                            </>
                         ) : (
-                            <><UploadIcon className="mr-2 h-4 w-4" />Upload</>
+                            <>
+                                <UploadIcon className="mr-2 h-4 w-4" />
+                                Upload
+                            </>
                         )}
                     </Button>
                 </div>
@@ -147,54 +158,52 @@ export function QuizAttachments({ quizId }: QuizAttachmentsProps) {
             <CardContent>
                 {isLoading ? (
                     <div className="flex items-center justify-center py-8">
-                        <Loader2Icon className="h-6 w-6 animate-spin" />
+                        <Loader2Icon className="h-6 w-6 animate-spin text-muted-foreground" />
                     </div>
                 ) : attachments.length === 0 ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                        <FileTextIcon className="mx-auto h-12 w-12 mb-2 opacity-50" />
-                        <p>No files uploaded yet</p>
+                    <div className="text-center py-8">
+                        <FileTextIcon className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                        <p className="mt-2 text-sm text-muted-foreground">
+                            No files uploaded yet
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                            Upload PDFs, Word docs, or text files
+                        </p>
                     </div>
                 ) : (
-                    <div className="space-y-3">
-                        {attachments.map((att) => (
+                    <div className="space-y-2">
+                        {attachments.map((attachment) => (
                             <div
-                                key={att.id}
-                                className="flex items-center justify-between p-4 border rounded-lg"
+                                key={attachment.id}
+                                className="flex items-center justify-between p-3 border rounded-lg hover:bg-accent/50 transition-colors"
                             >
-                                <div className="flex items-center gap-3 flex-1">
-                                    <FileTextIcon className="h-8 w-8 text-muted-foreground" />
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                    {getFileIcon(attachment.filename)}
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <p className="font-medium truncate">{att.filename}</p>
-                                            {getStatusIcon(att.embeddingStatus)}
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <span>{formatFileSize(att.size)}</span>
-                                            <span>•</span>
-                                            <Badge variant={att.embeddingStatus === "completed" ? "default" : "secondary"}>
-                                                {att.embeddingStatus}
-                                            </Badge>
-                                            {att.embeddingStatus === "completed" && (
+                                        <p className="text-sm font-medium truncate">
+                                            {attachment.filename || "Unnamed file"}
+                                        </p>
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                            <span>
+                                                {new Date(attachment.createdAt).toLocaleDateString()}
+                                            </span>
+                                            {attachment.content && (
                                                 <>
                                                     <span>•</span>
-                                                    <span>{att.chunkCount} chunks</span>
+                                                    <span>{attachment.content.length} chars</span>
                                                 </>
                                             )}
                                         </div>
-                                        {att.errorMessage && (
-                                            <p className="text-sm text-red-500 mt-1">
-                                                Error: {att.errorMessage}
-                                            </p>
-                                        )}
                                     </div>
                                 </div>
                                 <Button
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => handleDelete(att.id)}
+                                    className="h-8 w-8 shrink-0"
+                                    onClick={() => handleDelete(attachment.id)}
                                     disabled={deleteMutation.isPending}
                                 >
-                                    <TrashIcon className="h-4 w-4" />
+                                    <TrashIcon className="h-4 w-4 text-destructive" />
                                 </Button>
                             </div>
                         ))}

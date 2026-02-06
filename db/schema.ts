@@ -207,12 +207,13 @@ export const attachment = pgTable(
             () => conversation.id,
             { onDelete: "cascade" }
         ),
+        messageId: text("message_id"), // Reference to message.id (nullable)
         filename: varchar("filename", { length: 255 }),
-        storageKey: text("storage_key").notNull(),
-        url: text("url").notNull(),
-        contentType: varchar("content_type", { length: 255 }),
+        storageKey: text("storage_key"), // Nullable - will be populated after migration
+        url: text("url"), // Nullable - will be populated after migration
+        mediaType: varchar("media_type", { length: 255 }), // Using media_type to match DB column naming
         size: integer("size"),
-        content: text("content"),
+        content: text("content"), // Extracted text content for RAG
         createdAt: timestamp("created_at", { precision: 0 })
             .notNull()
             .defaultNow(),
@@ -224,6 +225,7 @@ export const attachment = pgTable(
     (table) => [
         index("attachment_quiz_id_index").on(table.quizId),
         index("attachment_conversation_id_index").on(table.conversationId),
+        index("attachment_message_id_index").on(table.messageId),
     ]
 );
 
