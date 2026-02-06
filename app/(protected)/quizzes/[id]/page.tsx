@@ -4,6 +4,7 @@
 import { PromptInputMessage } from "@/components/ai-elements/prompt-input"
 import { ChatPromptInput } from "@/components/chat/chat-prompt-input"
 import EditQuizDialog from "@/components/dialogs/edit-quiz-dialog"
+import { QuizAttachments } from "@/components/quiz-attachments-manager"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -177,7 +178,7 @@ const Page = () => {
                             <CardContent>
                                 <ChatPromptInput
                                     onSubmit={handleSubmit}
-                                    disabled={isLoading || sending}
+                                    status={sending ? "submitted" : "ready"}
                                     placeholder="Describe what kind of quiz you want to create..."
                                 />
                             </CardContent>
@@ -251,6 +252,7 @@ const Page = () => {
                                 </div>
                             </CardContent>
                         </Card>
+                        <QuizAttachments quizId={Number(id)} />
                     </div>
                 </div>
             </div>

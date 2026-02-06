@@ -1,5 +1,4 @@
 import AppHeader from "@/components/app-header";
-import { AppSidebar } from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { QuizProvider } from "@/providers/quiz-provider";
 import React from "react";

@@ -1,104 +1,129 @@
 // lib/storage.ts
-
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import crypto from "crypto";
+import {
+    S3Client,
+    PutObjectCommand,
+    GetObjectCommand,
+    DeleteObjectCommand,
+    HeadObjectCommand,
+} from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { nanoid } from "nanoid";
-import path from "path";
-import fs from "fs/promises";
 
-// Toggle between local and S3 storage
-const USE_S3 = process.env.USE_S3 === "true";
+const MINIO_ENDPOINT = process.env.MINIO_ENDPOINT;
+const MINIO_PUBLIC_ENDPOINT =
+    process.env.MINIO_PUBLIC_ENDPOINT ?? MINIO_ENDPOINT;
+const MINIO_BUCKET = process.env.MINIO_BUCKET;
 
-// S3 Configuration
-const s3Client = USE_S3
-    ? new S3Client({
-        region: process.env.AWS_REGION || "us-east-1",
-        credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-        },
-    })
-    : null;
-
-const S3_BUCKET = process.env.AWS_S3_BUCKET || "quizai-uploads";
-
-// Local storage directory
-const LOCAL_UPLOAD_DIR = process.env.UPLOAD_DIR || "./uploads";
-
-/**
- * Upload a file to storage (S3 or local filesystem)
- */
-export async function uploadFile(file: File, folder: string = ""): Promise<string> {
-    const ext = path.extname(file.name);
-    const uniqueName = `${nanoid()}${ext}`;
-    const key = folder ? `${folder}/${uniqueName}` : uniqueName;
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    if (USE_S3 && s3Client) {
-        // Upload to S3
-        await s3Client.send(
-            new PutObjectCommand({
-                Bucket: S3_BUCKET,
-                Key: key,
-                Body: buffer,
-                ContentType: file.type,
-            })
-        );
-
-        // Return S3 URL
-        return `https://${S3_BUCKET}.s3.amazonaws.com/${key}`;
-    } else {
-        // Upload to local filesystem
-        const uploadDir = path.join(LOCAL_UPLOAD_DIR, folder);
-        await fs.mkdir(uploadDir, { recursive: true });
-
-        const filePath = path.join(uploadDir, uniqueName);
-        await fs.writeFile(filePath, buffer);
-
-        // Return local URL (relative path for API access)
-        return `/uploads/${key}`;
+function normalizeEndpoint(endpoint?: string) {
+    if (!endpoint) {
+        throw new Error("MINIO_ENDPOINT is not configured");
     }
+    return endpoint.startsWith("http://") || endpoint.startsWith("https://")
+        ? endpoint
+        : `http://${endpoint}`;
 }
 
-/**
- * Get a signed URL for private file access (S3 only)
- */
-export async function getSignedFileUrl(key: string, expiresIn: number = 3600): Promise<string> {
-    if (!USE_S3 || !s3Client) {
-        // For local files, return the direct path
-        return `/uploads/${key}`;
-    }
+const s3Client = new S3Client({
+    region: "us-east-1",
+    endpoint: normalizeEndpoint(MINIO_ENDPOINT),
+    credentials: {
+        accessKeyId: process.env.MINIO_ROOT_USER ?? "",
+        secretAccessKey: process.env.MINIO_ROOT_PASSWORD ?? "",
+    },
+    forcePathStyle: true,
+});
 
+function getBucket() {
+    if (!MINIO_BUCKET) {
+        throw new Error("MINIO_BUCKET is not configured");
+    }
+    return MINIO_BUCKET;
+}
+
+export async function uploadFile(
+    key: string,
+    body: Buffer | Uint8Array | Blob,
+    contentType: string
+) {
+    await s3Client.send(
+        new PutObjectCommand({
+            Bucket: getBucket(),
+            Key: key,
+            Body: body,
+            ContentType: contentType,
+        })
+    );
+
+    return { key, url: getPublicUrl(key) };
+}
+
+export async function getPresignedUploadUrl(
+    key: string,
+    contentType: string,
+    expiresIn = 3600
+) {
+    const command = new PutObjectCommand({
+        Bucket: getBucket(),
+        Key: key,
+        ContentType: contentType,
+    });
+
+    return getSignedUrl(s3Client, command, { expiresIn });
+}
+
+export async function getPresignedDownloadUrl(
+    key: string,
+    expiresIn = 3600
+) {
     const command = new GetObjectCommand({
-        Bucket: S3_BUCKET,
+        Bucket: getBucket(),
         Key: key,
     });
 
-    return await getSignedUrl(s3Client, command, { expiresIn });
+    return getSignedUrl(s3Client, command, { expiresIn });
 }
 
-/**
- * Delete a file from storage
- */
-export async function deleteFile(url: string): Promise<void> {
-    if (USE_S3 && s3Client) {
-        // Extract key from S3 URL
-        const key = url.replace(`https://${S3_BUCKET}.s3.amazonaws.com/`, "");
+export async function deleteFile(key: string) {
+    await s3Client.send(
+        new DeleteObjectCommand({
+            Bucket: getBucket(),
+            Key: key,
+        })
+    );
+}
 
-        const { DeleteObjectCommand } = await import("@aws-sdk/client-s3");
+export async function fileExists(key: string): Promise<boolean> {
+    try {
         await s3Client.send(
-            new DeleteObjectCommand({
-                Bucket: S3_BUCKET,
+            new HeadObjectCommand({
+                Bucket: getBucket(),
                 Key: key,
             })
         );
-    } else {
-        // Delete from local filesystem
-        const filePath = path.join(LOCAL_UPLOAD_DIR, url.replace("/uploads/", ""));
-        await fs.unlink(filePath).catch(() => {
-            // Ignore if file doesn't exist
-        });
+        return true;
+    } catch {
+        return false;
     }
+}
+
+// Public URL for files in the public/ prefix (anonymous download enabled)
+export function getPublicUrl(key: string) {
+    const endpoint = normalizeEndpoint(MINIO_PUBLIC_ENDPOINT);
+    return `${endpoint}/${getBucket()}/${key}`;
+}
+
+// Helper to generate a unique key for attachments
+export function generateAttachmentKey(
+    quizId: string,
+    filename: string,
+    conversationId?: string,
+    isPublic = false
+) {
+    const sanitized = filename.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const prefix = isPublic ? "public" : "attachments";
+    const suffix = crypto.randomUUID();
+    const scope = conversationId
+        ? `quiz-${quizId}/conversation-${conversationId}`
+        : `quiz-${quizId}/global`;
+    return `${prefix}/${scope}/${suffix}-${sanitized}`;
 }

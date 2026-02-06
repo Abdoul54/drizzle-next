@@ -155,7 +155,7 @@ export default function Page() {
     const { messages, sendMessage, status, regenerate, stop } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
-            api: '/api/v2/chat',
+            api: '/api/v1/chat',
             body: { conversationId, quizId }
         }),
         // Pass initial messages - they already have the correct UIMessage format
@@ -250,7 +250,7 @@ export default function Page() {
                                         {/* Render file attachments first (for user messages) */}
                                         {message.role === 'user' && hasFiles && (
                                             <Message from={message.role}>
-                                                <MessageContent className='p-0 !bg-transparent'>
+                                                <MessageContent className='p-0 bg-transparent!'>
                                                     <MessageAttachments attachments={fileParts as AttachmentData[]} />
                                                 </MessageContent>
                                             </Message>

@@ -124,6 +124,7 @@ export const quiz = pgTable("quiz", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     title: varchar("title", { length: 255 }).notNull(),
     description: varchar("description", { length: 255 }).notNull(),
+    data: jsonb("data"),
     status: quizStatusEnum("status").notNull().default("draft"),
     createdBy: text("created_by")
         .notNull()
@@ -195,20 +196,36 @@ export const message = pgTable("message", {
 // ATTACHMENT TABLE
 // =============================================
 
-export const attachment = pgTable("attachment", {
-    id: bigserial("id", { mode: "number" }).primaryKey(),
-    conversationId: bigint("conversation_id", { mode: "number" })
-        .notNull()
-        .references(() => conversation.id, { onDelete: "cascade" }),
-    messageId: text("message_id")  // Changed from bigint
-        .references(() => message.id, { onDelete: "cascade" }),
-    filename: varchar("filename", { length: 255 }).notNull(),
-    url: text("url").notNull(),
-    content: text("content"),
-    mediaType: varchar("media_type", { length: 100 }).notNull(),
-    size: integer("size"),
-    createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
-});
+export const attachment = pgTable(
+    "attachment",
+    {
+        id: bigserial("id", { mode: "number" }).primaryKey(),
+        quizId: bigint("quiz_id", { mode: "number" })
+            .notNull()
+            .references(() => quiz.id, { onDelete: "cascade" }),
+        conversationId: bigint("conversation_id", { mode: "number" }).references(
+            () => conversation.id,
+            { onDelete: "cascade" }
+        ),
+        filename: varchar("filename", { length: 255 }),
+        storageKey: text("storage_key").notNull(),
+        url: text("url").notNull(),
+        contentType: varchar("content_type", { length: 255 }),
+        size: integer("size"),
+        content: text("content"),
+        createdAt: timestamp("created_at", { precision: 0 })
+            .notNull()
+            .defaultNow(),
+        updatedAt: timestamp("updated_at", { precision: 0 })
+            .notNull()
+            .defaultNow()
+            .$onUpdate(() => new Date()),
+    },
+    (table) => [
+        index("attachment_quiz_id_index").on(table.quizId),
+        index("attachment_conversation_id_index").on(table.conversationId),
+    ]
+);
 
 // =============================================
 // RELATIONS
@@ -242,6 +259,7 @@ export const quizRelations = relations(quiz, ({ one, many }) => ({
     }),
     questions: many(question),
     conversations: many(conversation),
+    attachments: many(attachment),
 }));
 
 export const questionRelations = relations(question, ({ one, many }) => ({
@@ -273,16 +291,15 @@ export const answerRelations = relations(answer, ({ one }) => ({
 }));
 
 export const attachmentRelations = relations(attachment, ({ one }) => ({
+    quiz: one(quiz, {
+        fields: [attachment.quizId],
+        references: [quiz.id],
+    }),
     conversation: one(conversation, {
         fields: [attachment.conversationId],
         references: [conversation.id],
     }),
-    message: one(message, {
-        fields: [attachment.messageId],
-        references: [message.id],
-    }),
 }));
-
 
 export const conversationRelations = relations(conversation, ({ one, many }) => ({
     user: one(user, {

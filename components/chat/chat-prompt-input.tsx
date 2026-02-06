@@ -25,7 +25,7 @@ const ACCEPTED_FILE_TYPES = 'application/pdf,image/jpeg,image/png,image/gif,imag
 
 interface ChatPromptInputProps {
     onSubmit: (message: PromptInputMessage) => void;
-    onStop: () => void;
+    onStop?: () => void;
     placeholder?: string;
     status?: ChatStatus;
     className?: string;
