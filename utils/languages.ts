@@ -4,7 +4,6 @@ export const languages = [
         "direction": "rtl",
         "labels": {
             "ar": "العربية",
-            "zgh": "ⵜⴰⵄⵔⴰⴱⵜ",
             "fr": "Arabe",
             "en": "Arabic",
             "es": "Árabe",
@@ -15,26 +14,10 @@ export const languages = [
         }
     },
     {
-        "code": "zgh",
-        "direction": "ltr",
-        "labels": {
-            "ar": "الأمازيغية",
-            "zgh": "ⵜⴰⵎⴰⵣⵉⵖⵜ",
-            "fr": "Amazighe",
-            "en": "Tamazight",
-            "es": "Amazigh",
-            "pt": "Amazigue",
-            "it": "Amazigh",
-            "de": "Amazigh",
-            "ru": "Амазигский"
-        }
-    },
-    {
         "code": "fr",
         "direction": "ltr",
         "labels": {
             "ar": "الفرنسية",
-            "zgh": "ⵜⴰⴼⵔⴰⵏⵙⵉⵙⵜ",
             "fr": "Français",
             "en": "French",
             "es": "Francés",
@@ -49,7 +32,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "الإنجليزية",
-            "zgh": "ⵜⴰⵏⴳⵍⵉⵣⵜ",
             "fr": "Anglais",
             "en": "English",
             "es": "Inglés",
@@ -64,7 +46,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "الإسبانية",
-            "zgh": "ⵜⴰⵙⴱⴰⵏⵢⵓⵍⵜ",
             "fr": "Espagnol",
             "en": "Spanish",
             "es": "Español",
@@ -79,7 +60,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "البرتغالية",
-            "zgh": "ⵜⴰⴱⵔⵜⵓⵖⵉⵣⵜ",
             "fr": "Portugais",
             "en": "Portuguese",
             "es": "Portugués",
@@ -94,7 +74,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "الإيطالية",
-            "zgh": "ⵜⴰⵉⵟⴰⵍⵢⴰⵏⵉⵜ",
             "fr": "Italien",
             "en": "Italian",
             "es": "Italiano",
@@ -109,7 +88,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "الألمانية",
-            "zgh": "ⵜⴰⵍⵎⴰⵏⵉⵜ",
             "fr": "Allemand",
             "en": "German",
             "es": "Alemán",
@@ -124,7 +102,6 @@ export const languages = [
         "direction": "ltr",
         "labels": {
             "ar": "الروسية",
-            "zgh": "ⵜⴰⵔⵓⵙⵉⵜ",
             "fr": "Russe",
             "en": "Russian",
             "es": "Ruso",
@@ -135,3 +112,15 @@ export const languages = [
         }
     }
 ]
+
+export const languageCodes = [
+    "ar",
+    "fr",
+    "en",
+    "es",
+    "pt",
+    "it",
+    "de",
+    "ru",
+] as const;
+
