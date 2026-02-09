@@ -36,33 +36,33 @@ export async function saveAssistantMessage({
     id,
     conversationId,
     text,
-    steps,
+    // steps,
     sources,
 }: {
     id: string;
     conversationId: number;
     text: string;
-    steps: any[];
+    // steps: any[];
     sources?: any[];
 }) {
     const parts: any[] = [];
 
     // Tool invocations from steps
-    for (const step of steps) {
-        for (const toolCall of step.toolCalls ?? []) {
-            const toolResult = step.toolResults?.find(
-                (r: any) => r.toolCallId === toolCall.toolCallId
-            );
-            parts.push({
-                type: "tool-invocation",
-                toolName: toolCall.toolName,
-                toolCallId: toolCall.toolCallId,
-                state: toolResult ? "result" : "call",
-                args: toolCall.input,
-                ...(toolResult ? { output: toolResult.output } : {}),
-            });
-        }
-    }
+    // for (const step of steps) {
+    //     for (const toolCall of step.toolCalls ?? []) {
+    //         const toolResult = step.toolResults?.find(
+    //             (r: any) => r.toolCallId === toolCall.toolCallId
+    //         );
+    //         parts.push({
+    //             type: "tool-invocation",
+    //             toolName: toolCall.toolName,
+    //             toolCallId: toolCall.toolCallId,
+    //             state: toolResult ? "result" : "call",
+    //             args: toolCall.input,
+    //             ...(toolResult ? { output: toolResult.output } : {}),
+    //         });
+    //     }
+    // }
 
     if (text) {
         parts.push({ type: "text", text });

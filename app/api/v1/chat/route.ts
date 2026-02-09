@@ -16,6 +16,9 @@ import { generateQuiz } from "@/lib/tools";
 import { languageCodes } from "@/utils/languages";
 import { chatRateLimiter, withRateLimit } from "@/lib/rate-limit";
 import { truncateToTokenBudget } from "@/lib/token-budget";
+import { conversation } from "@/db/schema";
+import { db } from "@/db";
+import { eq } from "drizzle-orm";
 
 export const maxDuration = 30;
 
@@ -105,6 +108,15 @@ export async function POST(req: Request) {
                 console.warn(`RAG context truncated: ${originalTokens} → ${truncatedTokens} tokens`);
             }
         }
+        let currentDraft = null;
+        if (convId) {
+            const [conv] = await db
+                .select({ draft: conversation.draft })
+                .from(conversation)
+                .where(eq(conversation.id, convId))
+                .limit(1);
+            currentDraft = conv?.draft;
+        }
 
         const assistantMessageId = generateId();
 
@@ -166,9 +178,18 @@ LANGUAGE RULES (CRITICAL)
 Generate quiz ONLY in the language the user is speaking.
 
 Default:
-- If user speaks English → generate ONLY English
-- Do NOT include other languages
-- Do NOT auto translate
+- If user speaks English → generate ONLY English keys
+- Do NOT include other languages unless asked
+
+When user asks to ADD a language (e.g. "add french", "translate to arabic"):
+- You MUST KEEP all existing language keys
+- ADD the new language key to every text and option
+- Do NOT remove or replace existing languages
+- Example: if draft has {"en": "..."}, adding french → {"en": "...", "fr": "..."}
+
+When user asks to REMOVE a language:
+- Remove only that language key
+- Keep all other languages
 
 If user explicitly asks:
 "add french"
@@ -219,6 +240,17 @@ Be intelligent and helpful.
 Be concise.
 Do not explain tool usage to the user.
 Just call the tool when quiz generation is requested.
+
+========================
+CURRENT DRAFT
+========================
+${currentDraft
+                    ? JSON.stringify(currentDraft, null, 2)
+                    : 'No draft yet.'}
+
+When modifying the quiz (adding languages, editing, etc.):
+- Use the current draft above as your base
+- Preserve ALL existing content unless asked to change it
 `,
             messages: await convertToModelMessages(processedMessages),
             tools: {
@@ -249,7 +281,7 @@ Just call the tool when quiz generation is requested.
                         id: assistantMessageId,
                         conversationId: convId,
                         text,
-                        steps,
+                        // steps,
                     });
 
                     console.log('[Chat Complete]', {
