@@ -1,148 +1,64 @@
-
-
-
 import { db } from "@/db";
-import { attachment, quiz } from "@/db/schema";
+import { conversation } from "@/db/schema";
 import { tool } from "ai";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-const quizIdSchema = z.coerce.number().int().positive();
-const conversationIdSchema = z.coerce.number().int().positive().optional();
+const questionTypeValues = [
+    "choice",
+    "true-false",
+    "fill-in",
+    "long-fill-in",
+    "matching",
+    "sequencing",
+    "numeric",
+    "likert",
+    "performance",
+] as const;
 
-const questionSchema = z.discriminatedUnion("type", [
-    z.object({
-        type: z.literal("multiple_choice"),
-        question: z.string().min(1),
-        options: z.array(z.string().min(1)).min(2),
-        correctAnswer: z.string().min(1),
-    }),
-    z.object({
-        type: z.literal("true_false"),
-        question: z.string().min(1),
-        correctAnswer: z.union([z.boolean(), z.string()]).transform((val) =>
-            typeof val === "string" ? val.toLowerCase() === "true" : val
-        ),
-    }),
-    z.object({
-        type: z.literal("short_answer"),
-        question: z.string().min(1),
-        correctAnswer: z.string().optional(),
-    }),
-    z.object({
-        type: z.literal("fill_in_blank"),
-        question: z.string().min(1),
-        correctAnswer: z.string().min(1),
-    }),
-]);
-
-function sanitizeJsonString(value: string): string {
-    return value
-        .replace(/„/g, '"')
-        .replace(/“/g, '"')
-        .replace(/”/g, '"')
-        .replace(/«/g, '"')
-        .replace(/»/g, '"')
-        .replace(/‘/g, "'")
-        .replace(/’/g, "'");
-}
-
-function parseQuestions(
-    input: z.infer<typeof questionSchema>[] | string
-): z.infer<typeof questionSchema>[] {
-    if (typeof input !== "string") {
-        return input;
-    }
-
-    const sanitized = sanitizeJsonString(input);
-    const parsed = JSON.parse(sanitized) as unknown;
-    return z.array(questionSchema).parse(parsed);
-}
-
-export const retrieveAttachmentsTool = tool({
-    description: "Retrieve text content from attachments for a quiz",
-    inputSchema: z.object({
-        quizId: z.string(),
-        conversationId: z.string().optional(),
-    }),
-    execute: async ({ quizId, conversationId }) => {
-        const parsedQuizId = quizIdSchema.safeParse(quizId);
-        if (!parsedQuizId.success) {
-            return [];
-        }
-
-        const parsedConversationId = conversationIdSchema.safeParse(
-            conversationId
-        );
-        const conversationIdValue = parsedConversationId.success
-            ? parsedConversationId.data
-            : undefined;
-
-        const rows = await db
-            .select({
-                content: attachment.content,
-                filename: attachment.filename,
-            })
-            .from(attachment)
-            .where(
-                and(
-                    eq(attachment.quizId, parsedQuizId.data),
-                    conversationIdValue
-                        ? or(
-                            eq(attachment.conversationId, conversationIdValue),
-                            isNull(attachment.conversationId)
-                        )
-                        : isNull(attachment.conversationId)
-                )
-            );
-
-        return rows.filter((row) => row.content !== null);
-    },
+const questionInput = z.object({
+    type: z.enum(questionTypeValues),
+    text: z.string().min(1).describe("The question text"),
+    subText: z.string().optional().describe("Optional hint or subtitle"),
+    media: z.string().optional().describe("Optional media URL"),
+    options: z
+        .array(z.string().min(1))
+        .min(2)
+        .describe("Answer option labels"),
+    correctOptionIndexes: z
+        .array(z.number().int().min(0))
+        .min(1)
+        .describe("Zero-based indexes of correct options"),
 });
 
-
-export const saveQuizTool = tool({
+export const generateQuiz = tool({
     description:
-        "Save the generated quiz questions to the database. Call this AFTER displaying the quiz to the user.",
+        "Save generated quiz questions as a draft on the current conversation. The user can review, request edits, and approve when ready.",
     inputSchema: z.object({
-        quizId: z.string(),
-        questions: z.union([z.array(questionSchema), z.string()]),
+        conversationId: z.number().int().positive().describe("The conversation ID"),
+        questions: z.array(questionInput).min(1).describe("Array of questions"),
     }),
-    execute: async ({ quizId, questions }) => {
-        const parsedQuizId = quizIdSchema.safeParse(quizId);
-        if (!parsedQuizId.success) {
-            return { success: false, error: "Invalid quiz id" };
-        }
-
+    execute: async ({ conversationId, questions }) => {
         try {
-            const parsedQuestions = parseQuestions(questions);
-            const validatedQuestions = z
-                .array(questionSchema)
-                .parse(parsedQuestions);
+            console.log("Tool: saving quiz", { conversationId, questions });
 
             await db
-                .update(quiz)
-                .set({
-                    data: { questions: validatedQuestions },
-                    status: "draft",
-                })
-                .where(eq(quiz.id, parsedQuizId.data));
+                .update(conversation)
+                .set({ draft: { questions } })
+                .where(eq(conversation.id, conversationId));
 
-            return { success: true, questionCount: validatedQuestions.length };
+            console.log("Tool: quiz saved");
+            return {
+                success: true,
+                questionCount: questions.length,
+                message: "Draft saved. The user can review and approve when ready.",
+            };
         } catch (error) {
-            if (error instanceof z.ZodError) {
-                return {
-                    success: false,
-                    error: "Invalid question format",
-                    details: error.message,
-                };
-            }
-            if (error instanceof SyntaxError) {
-                return { success: false, error: "Invalid JSON format" };
-            }
-            return { success: false, error: "Failed to save quiz" };
+            console.error("Failed to save quiz draft:", error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : "Unknown error",
+            };
         }
     },
 });
-
-export { questionSchema };

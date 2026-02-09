@@ -173,6 +173,7 @@ export const conversation = pgTable("conversation", {
     quizId: bigint("quiz_id", { mode: "number" })
         .notNull()
         .references(() => quiz.id, { onDelete: "cascade" }),
+    draft: jsonb("draft"),  // ← add this
     createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { precision: 0 })
         .notNull()
@@ -207,7 +208,8 @@ export const attachment = pgTable(
             () => conversation.id,
             { onDelete: "cascade" }
         ),
-        messageId: text("message_id"), // Reference to message.id (nullable)
+        messageId: text("message_id")
+            .references(() => message.id, { onDelete: "cascade" }),
         filename: varchar("filename", { length: 255 }),
         storageKey: text("storage_key"), // Nullable - will be populated after migration
         url: text("url"), // Nullable - will be populated after migration

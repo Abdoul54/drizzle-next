@@ -156,7 +156,7 @@ export default function Page() {
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
             api: '/api/v1/chat',
-            body: { conversationId, quizId }
+            body: { conversationId, quizId },
         }),
         // Pass initial messages - they already have the correct UIMessage format
         messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],

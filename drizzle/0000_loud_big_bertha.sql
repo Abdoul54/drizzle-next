@@ -26,7 +26,12 @@ CREATE TABLE "attachment" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"quiz_id" bigint NOT NULL,
 	"conversation_id" bigint,
+	"message_id" text,
 	"filename" varchar(255),
+	"storage_key" text,
+	"url" text,
+	"media_type" varchar(255),
+	"size" integer,
 	"content" text,
 	"created_at" timestamp (0) DEFAULT now() NOT NULL,
 	"updated_at" timestamp (0) DEFAULT now() NOT NULL
@@ -36,6 +41,7 @@ CREATE TABLE "conversation" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"user_id" text NOT NULL,
 	"quiz_id" bigint NOT NULL,
+	"draft" jsonb,
 	"created_at" timestamp (0) DEFAULT now() NOT NULL,
 	"updated_at" timestamp (0) DEFAULT now() NOT NULL
 );
@@ -112,6 +118,7 @@ ALTER TABLE "answer" ADD CONSTRAINT "answer_question_id_question_id_fk" FOREIGN 
 ALTER TABLE "answer" ADD CONSTRAINT "answer_value_option_id_fk" FOREIGN KEY ("value") REFERENCES "public"."option"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "attachment" ADD CONSTRAINT "attachment_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "attachment" ADD CONSTRAINT "attachment_conversation_id_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "attachment" ADD CONSTRAINT "attachment_message_id_message_id_fk" FOREIGN KEY ("message_id") REFERENCES "public"."message"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation" ADD CONSTRAINT "conversation_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "conversation" ADD CONSTRAINT "conversation_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message" ADD CONSTRAINT "message_conversation_id_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -122,5 +129,6 @@ ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("
 CREATE INDEX "account_user_id_index" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "attachment_quiz_id_index" ON "attachment" USING btree ("quiz_id");--> statement-breakpoint
 CREATE INDEX "attachment_conversation_id_index" ON "attachment" USING btree ("conversation_id");--> statement-breakpoint
+CREATE INDEX "attachment_message_id_index" ON "attachment" USING btree ("message_id");--> statement-breakpoint
 CREATE INDEX "session_user_id_index" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verification_identifier_index" ON "verification" USING btree ("identifier");

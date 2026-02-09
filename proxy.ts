@@ -15,7 +15,6 @@ export const config = {
     matcher: [
         "/",
         "/chat/:path*",
-        "/quiz/:path*",
         "/quizzes/:path*",
         "/conversation/:path*",
         "/conversations/:path*",

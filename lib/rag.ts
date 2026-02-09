@@ -61,11 +61,11 @@ async function fetchAttachmentDocuments({
     conversationId?: number | null;
 }): Promise<RagDocument[]> {
     if (!quizId) {
-        console.log('❌ No quizId provided to fetchAttachmentDocuments');
+        // console.log('❌ No quizId provided to fetchAttachmentDocuments');
         return [];
     }
 
-    console.log('🔍 Fetching attachments:', { quizId, conversationId });
+    // console.log('🔍 Fetching attachments:', { quizId, conversationId });
 
     const rows = await db
         .select({
@@ -88,27 +88,27 @@ async function fetchAttachmentDocuments({
             )
         );
 
-    console.log('📄 Raw attachments found:', {
-        count: rows.length,
-        files: rows.map(r => ({
-            id: r.id,
-            filename: r.filename,
-            hasContent: !!r.content,
-            contentLength: r.content?.length || 0,
-        }))
-    });
+    // console.log('📄 Raw attachments found:', {
+    //     count: rows.length,
+    //     files: rows.map(r => ({
+    //         id: r.id,
+    //         filename: r.filename,
+    //         hasContent: !!r.content,
+    //         contentLength: r.content?.length || 0,
+    //     }))
+    // });
 
     const filtered = rows.filter((row) => row.content);
 
-    console.log('✅ Attachments with content:', {
-        count: filtered.length,
-        files: filtered.map(r => ({
-            id: r.id,
-            filename: r.filename,
-            contentLength: r.content?.length || 0,
-            preview: r.content?.substring(0, 100) + '...',
-        }))
-    });
+    // console.log('✅ Attachments with content:', {
+    //     count: filtered.length,
+    //     files: filtered.map(r => ({
+    //         id: r.id,
+    //         filename: r.filename,
+    //         contentLength: r.content?.length || 0,
+    //         preview: r.content?.substring(0, 100) + '...',
+    //     }))
+    // });
 
     return filtered.map((row) => ({
         id: row.id,
@@ -130,15 +130,15 @@ export async function buildRagContext({
     conversationId?: number | null;
     limit?: number;
 }): Promise<{ context: string }> {
-    console.log('🚀 buildRagContext called:', {
-        query: query.substring(0, 100),
-        quizId,
-        conversationId,
-        hasQuery: !!query.trim()
-    });
+    // console.log('🚀 buildRagContext called:', {
+    //     query: query.substring(0, 100),
+    //     quizId,
+    //     conversationId,
+    //     hasQuery: !!query.trim()
+    // });
 
     if (!query.trim()) {
-        console.log('⚠️ No query text provided');
+        // console.log('⚠️ No query text provided');
         return { context: 'No user query available.' };
     }
 
@@ -148,11 +148,11 @@ export async function buildRagContext({
     });
 
     if (documents.length === 0) {
-        console.log('⚠️ No documents found with content');
+        // console.log('⚠️ No documents found with content');
         return { context: 'No attachment sources available.' };
     }
 
-    console.log('🎯 Embedding query and documents...');
+    // console.log('🎯 Embedding query and documents...');
 
     const [docEmbeddings, { embedding: queryEmbedding }] = await Promise.all([
         embedDocuments(documents),
@@ -171,11 +171,11 @@ export async function buildRagContext({
         .slice(0, limit)
         .map(({ doc, score }) => ({ doc, score }));
 
-    console.log('📊 Ranked documents:', ranked.map(r => ({
-        filename: r.doc.title,
-        score: r.score.toFixed(3),
-        contentLength: r.doc.content.length,
-    })));
+    // console.log('📊 Ranked documents:', ranked.map(r => ({
+    //     filename: r.doc.title,
+    //     score: r.score.toFixed(3),
+    //     contentLength: r.doc.content.length,
+    // })));
 
     const context = ranked
         .map(
@@ -184,11 +184,11 @@ export async function buildRagContext({
         )
         .join('\n\n');
 
-    console.log('✅ RAG context built:', {
-        documentCount: ranked.length,
-        totalLength: context.length,
-        preview: context.substring(0, 200) + '...',
-    });
+    // console.log('✅ RAG context built:', {
+    //     documentCount: ranked.length,
+    //     totalLength: context.length,
+    //     preview: context.substring(0, 200) + '...',
+    // });
 
     return { context };
 }

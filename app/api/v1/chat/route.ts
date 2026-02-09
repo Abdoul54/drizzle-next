@@ -1,9 +1,17 @@
-// app/api/v1/chat/route.ts (UPDATED VERSION)
+// app/api/v1/chat/route.ts
 import { getCurrentUser } from "@/lib/auth-session";
-import { openai } from '@ai-sdk/openai';
-import { streamText, convertToModelMessages, stepCountIs } from 'ai';
-import { buildRagContext } from '@/lib/rag';
-import { convertTextFilesToContent } from '@/lib/message-converter'; // NEW IMPORT
+import { openai } from "@ai-sdk/openai";
+import { streamText, convertToModelMessages, generateId, stepCountIs } from "ai";
+import { buildRagContext } from "@/lib/rag";
+import { convertTextFilesToContent } from "@/lib/message-converter";
+import {
+    saveUserMessage,
+    saveAssistantMessage,
+    extractQueryText,
+    parseId,
+} from "@/lib/chat-persistence";
+import { generateQuiz } from "@/lib/tools";
+
 
 export const maxDuration = 30;
 
@@ -18,84 +26,32 @@ export async function POST(req: Request) {
     }
 
     const { messages, conversationId, quizId } = await req.json();
+    const convId = parseId(conversationId);
+    const qzId = parseId(quizId) ?? undefined;
 
-    // STEP 1: Convert text files to text content BEFORE processing
-    const processedMessages = await convertTextFilesToContent(messages);
-
-    const latestUserMessage = processedMessages
-        .slice()
-        .reverse()
-        .find((message: { role: string }) => message.role === "user");
-
-    // Extract query text - messages use parts array, not content field
-    let queryText = "";
-
-    if (latestUserMessage?.parts && Array.isArray(latestUserMessage.parts)) {
-        // Extract text from parts array
-        const textParts = latestUserMessage.parts
-            .filter((part: any) => part.type === "text")
-            .map((part: any) => part.text || part.content || "");
-        queryText = textParts.join(" ").trim();
-    } else if (typeof latestUserMessage?.content === "string") {
-        // Fallback for old format
-        queryText = latestUserMessage.content;
-    } else if (latestUserMessage?.content) {
-        queryText = JSON.stringify(latestUserMessage.content);
+    if (convId) {
+        await saveUserMessage(messages, convId);
     }
 
-    console.log('🔍 Query extraction:', {
-        hasLatestMessage: !!latestUserMessage,
-        hasParts: Array.isArray(latestUserMessage?.parts),
-        partsCount: latestUserMessage?.parts?.length || 0,
-        contentType: typeof latestUserMessage?.content,
-        queryText: queryText.substring(0, 100),
-        queryLength: queryText.length,
-    });
-
-    const parsedConversationId =
-        typeof conversationId === 'number'
-            ? conversationId
-            : typeof conversationId === 'string'
-                ? Number(conversationId)
-                : null;
-
-    const parsedQuizId =
-        typeof quizId === 'number'
-            ? quizId
-            : typeof quizId === 'string'
-                ? Number(quizId)
-                : undefined;
+    const processedMessages = await convertTextFilesToContent(messages);
+    const queryText = extractQueryText(processedMessages);
 
     const { context: contextBlock } = queryText
-        ? await buildRagContext({
-            query: queryText,
-            quizId: Number.isNaN(parsedQuizId ?? NaN)
-                ? undefined
-                : parsedQuizId,
-            conversationId: Number.isNaN(parsedConversationId ?? NaN)
-                ? null
-                : parsedConversationId,
-        })
-        : { context: 'No user query available.' };
+        ? await buildRagContext({ query: queryText, quizId: qzId, conversationId: convId })
+        : { context: "No user query available." };
 
-    // Debug logging
-    console.log('📚 RAG Context Debug:', {
-        quizId: parsedQuizId,
-        conversationId: parsedConversationId,
-        queryText: queryText.substring(0, 100) + '...',
-        contextLength: contextBlock.length,
-        hasContext: contextBlock !== 'No attachment sources available.' && contextBlock !== 'No user query available.',
-        contextPreview: contextBlock.substring(0, 200) + '...',
-    });
+    const assistantMessageId = generateId();
 
-    const result = streamText({
-        model: openai(process.env.OPENAI_MODEL || 'gpt-4o-mini'),
-        stopWhen: stepCountIs(10),
-        system: `You are a helpful quiz generator assistant.
+    try {
+        const result = streamText({
+            model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+            system: `You are a helpful quiz generator assistant.
 
 Information:
 - User's name is ${user?.name}
 - User speaks English
+- Quiz id is ${quizId}
+- Conversation id is ${conversationId}
 
 ## Context from Uploaded Documents:
 ${contextBlock}
@@ -104,26 +60,44 @@ ${contextBlock}
 - When users ask about uploaded documents, PDFs, or files, USE THE CONTEXT ABOVE to answer their questions.
 - The context contains text extracted from documents the user uploaded to this quiz.
 - If the user asks "what's in the PDF?" or "what does the document say?", reference the specific information from the Context section.
-- You can use the web_search tool for information NOT in the uploaded documents.
 - Be specific when referencing document content - mention page numbers, sections, or key points from the context.
+- When generating the quiz use the generateQuiz tool, and NEVER output quiz questions in assistant text.
 `,
-        // Use processed messages with text files converted
-        messages: await convertToModelMessages(processedMessages),
-        tools: {
-            web_search: openai.tools.webSearch({
-                externalWebAccess: true,
-            })
-        },
-        onStepFinish: ({ toolCalls, toolResults }) => {
-            console.log('Step finished:', { toolCalls, toolResults });
-        },
-        onError: (error) => {
-            console.error('Stream error:', error);
-        },
-        onFinish: async ({ text, response }) => {
-            console.log('✅ Response generated, context was:', contextBlock.length, 'chars');
-        },
-    });
+            messages: await convertToModelMessages(processedMessages),
+            tools: {
+                generateQuiz
+            },
+            stopWhen: stepCountIs(10),
+            onError: async ({ error }) => {
+                console.log(error)
+            },
+            onFinish: async ({ text, steps }) => {
+                if (!convId) return;
+                try {
+                    await saveAssistantMessage({
+                        id: assistantMessageId,
+                        conversationId: convId,
+                        text,
+                        steps,
+                    });
+                } catch (error) {
+                    console.error("Failed to save assistant message:", error);
+                }
+            },
+        });
 
-    return result.toUIMessageStreamResponse();
+        return result.toUIMessageStreamResponse();
+    } catch (error) {
+        console.error('Detailed stream error:', error);
+        return new Response(
+            JSON.stringify({
+                error: error instanceof Error ? error.message : 'Unknown error',
+                details: error
+            }),
+            {
+                status: 500,
+                headers: { "Content-Type": "application/json" }
+            }
+        );
+    }
 }
