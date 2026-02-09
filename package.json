@@ -53,6 +53,7 @@
     "drizzle-orm": "^0.45.1",
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
+    "lru-cache": "^11.2.5",
     "lucide-react": "^0.563.0",
     "mammoth": "^1.11.0",
     "media-chrome": "^4.17.2",

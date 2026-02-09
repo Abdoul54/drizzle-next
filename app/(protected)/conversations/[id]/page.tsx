@@ -10,65 +10,26 @@ import {
     AttachmentHoverCardTrigger,
     AttachmentInfo,
     AttachmentPreview,
-    AttachmentRemove,
     Attachments,
     getAttachmentLabel,
     getMediaCategory,
 } from '@/components/ai-elements/attachments';
 import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ai-elements/conversation';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
-import {
-    PromptInput,
-    PromptInputActionAddAttachments,
-    PromptInputActionMenu,
-    PromptInputActionMenuContent,
-    PromptInputActionMenuTrigger,
-    PromptInputBody,
-    PromptInputButton,
-    PromptInputFooter,
-    PromptInputHeader,
-    PromptInputMessage,
-    PromptInputSubmit,
-    PromptInputTextarea,
-    PromptInputTools,
-    usePromptInputAttachments
-} from '@/components/ai-elements/prompt-input';
+import { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-elements/reasoning';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import ChatError from '@/components/chat-error';
+import ChatErrorHandler from '@/components/chat-error-handler';
 import ChatSkeleton from '@/components/chat-skeleton';
 import { ChatPromptInput } from '@/components/chat/chat-prompt-input';
 import { Button } from '@/components/ui/button';
 import { useGetConversation } from '@/hooks/queries/use-conversation';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
-import { ArrowLeft, GlobeIcon } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
-
-// Component to display attachments in the prompt input
-const PromptInputAttachmentsDisplay = () => {
-    const attachments = usePromptInputAttachments();
-
-    if (attachments.files.length === 0) {
-        return null;
-    }
-
-    return (
-        <Attachments variant="inline">
-            {attachments.files.map((attachment) => (
-                <Attachment
-                    data={attachment}
-                    key={attachment.id}
-                    onRemove={() => attachments.remove(attachment.id)}
-                >
-                    <AttachmentPreview />
-                    <AttachmentRemove />
-                </Attachment>
-            ))}
-        </Attachments>
-    );
-};
+import { useEffect, useRef } from 'react';
 
 // Component to render file attachments in messages
 const MessageAttachments = ({ attachments }: { attachments: AttachmentData[] }) => {
@@ -134,9 +95,6 @@ export default function Page() {
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    const [webSearch, setWebSearch] = useState(false);
-    const [input, setInput] = useState('');
-
     // Track if we've triggered the initial AI response
     const hasTriggeredInitialResponse = useRef(false);
 
@@ -144,7 +102,7 @@ export default function Page() {
     const needsResponse = searchParams.get('new') === 'true';
 
     // Fetch conversation with messages and quiz data
-    const { data: conversation, error, isLoading } = useGetConversation(id as string);
+    const { data: conversation, error: conversationError, isLoading } = useGetConversation(id as string);
 
     const conversationId = conversation?.id;
     const quizId = conversation?.quizId;
@@ -152,21 +110,21 @@ export default function Page() {
     const initialMessages = conversation?.messages ?? [];
 
     // Setup AI chat with initial messages from DB
-    const { messages, sendMessage, status, regenerate, stop } = useChat({
+    const { messages, sendMessage, status, error, regenerate, stop } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
             api: '/api/v1/chat',
             body: { conversationId, quizId },
         }),
         // Pass initial messages - they already have the correct UIMessage format
-        messages: (error || isLoading) ? [] : initialMessages as unknown as UIMessage[],
+        messages: (conversationError || isLoading) ? [] : initialMessages as unknown as UIMessage[],
     });
 
     // Trigger AI response for new conversations with initial message
     useEffect(() => {
         if (
             !isLoading &&
-            !error &&
+            !conversationError &&
             conversationId &&
             needsResponse &&
             !hasTriggeredInitialResponse.current &&
@@ -184,12 +142,11 @@ export default function Page() {
                 router.replace(`/conversations/${id}`, { scroll: false });
             }
         }
-    }, [isLoading, error, conversationId, needsResponse, initialMessages.length, messages, regenerate, status, router, id]);
+    }, [isLoading, conversationError, conversationId, needsResponse, initialMessages.length, messages, regenerate, status, router, id]);
 
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
             sendMessage({ text: message.text, files: message.files });
-            setInput('');
         }
     };
 
@@ -210,6 +167,15 @@ export default function Page() {
             return p.type === 'file';
         }) as Array<{ type: string; url: string; mediaType: string; filename: string }>;
     };
+
+    if (status === 'error' && error) {
+        return (
+            <ChatErrorHandler
+                error={error}
+                onRetry={() => regenerate()}
+            />
+        )
+    }
 
     return (
         <div className="flex flex-col h-[calc(100vh-6rem)]">
@@ -237,8 +203,8 @@ export default function Page() {
                         <ConversationContent>
                             <ChatSkeleton />
                         </ConversationContent>
-                    ) : error ? (
-                        <ChatError error={error?.message} />
+                    ) : conversationError ? (
+                        <ChatError error={conversationError?.message} />
                     ) : (
                         <ConversationContent>
                             {messages.map((message) => {
