@@ -45,7 +45,7 @@
     "ai": "^6.0.57",
     "ai-sdk-ollama": "^3.3.0",
     "ansi-to-react": "^6.2.6",
-    "axios": "^1.13.4",
+    "axios": "^1.13.5",
     "better-auth": "^1.4.17",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
