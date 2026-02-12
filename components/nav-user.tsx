@@ -15,7 +15,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-import { LogOut, UserCircle2 } from "lucide-react"
+import { LogOut, UserCircle2, UserIcon, UserRound } from "lucide-react"
 import { User } from "better-auth"
 import { signOut } from "@/lib/auth-client"
 import { useRouter } from "next/navigation"
@@ -52,19 +52,19 @@ export function NavUser({
 
     const initials = user?.name
         ? user.name.trim().split(/\s+/).map(n => n[0]).join("")
-        : "?"
+        : null
 
     const { bg, text } = getAvatarColors(user?.name || "");
 
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Avatar className="h-10 w-10 rounded-md cursor-pointer">
+                <Avatar className="h-9 w-9 rounded-md cursor-pointer">
                     <AvatarImage src={user?.image || ""} alt={user?.name} />
                     <AvatarFallback
                         className={`rounded-md ${bg} ${text}`}
                     >
-                        {initials}
+                        {initials ? initials : <UserRound className="size-5" />}
                     </AvatarFallback>
                 </Avatar>
             </DropdownMenuTrigger>
@@ -81,7 +81,7 @@ export function NavUser({
                             <AvatarFallback
                                 className={`rounded-md ${bg} ${text}`}
                             >
-                                {initials}
+                                {!initials ? initials : <UserRound className="size-4" />}
                             </AvatarFallback>
                         </Avatar>
                         <div className="grid flex-1 text-left text-sm leading-tight">

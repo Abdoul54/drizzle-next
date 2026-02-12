@@ -6,13 +6,28 @@ import ChatError from '@/components/chat-error';
 import ChatErrorHandler from '@/components/chat-error-handler';
 import ChatSkeleton from '@/components/chat-skeleton';
 import { ConversationChat } from '@/components/conversation-chat';
+import { ConversationPreview } from '@/components/conversation-preview';
 import { Button } from '@/components/ui/button';
 import { useGetConversation } from '@/hooks/queries/use-conversation';
+import { t } from '@/lib/localized';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport, UIMessage } from 'ai';
 import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+
+const LOCALE = "en"
+
+export type SelectionValue =
+    | { type: "text" }
+    | { type: "subtext" }
+    | { type: "option"; id: number }
+    | null;
+
+export type QuestionSelection = {
+    questionIndex: number;
+    selection: SelectionValue;
+} | null;
 
 export default function Page() {
     const { id } = useParams();
@@ -27,18 +42,34 @@ export default function Page() {
 
     // Fetch conversation with messages and quiz data
     const { data: conversation, error: conversationError, isLoading } = useGetConversation(id as string);
+    const [selectedItem, setSelectedItem] = useState<QuestionSelection>(null);
+
 
     const conversationId = conversation?.id;
     const quizId = conversation?.quizId;
     const quizData = conversation?.quiz;
     const initialMessages = conversation?.messages ?? [];
 
+
+    const renderText = () => {
+        switch (selectedItem?.selection?.type) {
+            case 'text':
+                return `User selected the text of the question number ${selectedItem?.questionIndex + 1}`
+            case 'subtext':
+                return `User selected the hint of the question number ${selectedItem?.questionIndex + 1}`
+            case 'option':
+                return `User selected option number ${selectedItem?.selection?.id + 1} of the question number ${selectedItem?.questionIndex + 1}`
+            default:
+                return null
+        }
+    }
+
     // Setup AI chat with initial messages from DB
     const { messages, sendMessage, status, error, regenerate, stop } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
             api: '/api/v1/chat',
-            body: { conversationId, quizId },
+            body: { conversationId, quizId, selection: renderText() },
         }),
         // Pass initial messages - they already have the correct UIMessage format
         messages: (conversationError || isLoading) ? [] : initialMessages as unknown as UIMessage[],
@@ -70,7 +101,7 @@ export default function Page() {
 
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
-            sendMessage({ text: message.text, files: message.files });
+            sendMessage({ text: message.text, files: message.files, metadata: { selection: renderText() } });
         }
     };
 
@@ -82,6 +113,10 @@ export default function Page() {
             router.back();
         }
     };
+
+    const removeSelection = () => {
+        setSelectedItem(null)
+    }
 
     if (status === 'error' && error) {
         return (
@@ -104,11 +139,11 @@ export default function Page() {
                         </Button>
                         <div className="flex-1 min-w-0">
                             <h1 className="text-lg font-semibold truncate">
-                                {quizData?.title ?? 'Conversation'}
+                                {t(quizData?.title, LOCALE) ?? 'Conversation'}
                             </h1>
                             {quizData?.description && (
                                 <p className="text-sm text-muted-foreground truncate">
-                                    {quizData.description}
+                                    {t(quizData.description, LOCALE)}
                                 </p>
                             )}
                         </div>
@@ -129,6 +164,8 @@ export default function Page() {
                             status={status}
                             onSubmit={handleSubmit}
                             onStop={stop}
+                            selectedItem={selectedItem}
+                            removeSelection={removeSelection}
                             placeholder="Describe what kind of quiz you want to create..."
                         />
                     )}
@@ -137,7 +174,7 @@ export default function Page() {
 
             {/* Preview Panel */}
             <div className="flex flex-1 flex-col">
-
+                <ConversationPreview questions={conversation?.draft?.questions} selectedItem={selectedItem} setSelectedItem={setSelectedItem} />
             </div>
         </div>
     );

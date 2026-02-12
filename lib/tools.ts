@@ -1,58 +1,43 @@
+// lib/tools.ts
+
 import { db } from "@/db";
 import { conversation } from "@/db/schema";
 import { tool } from "ai";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
-
-const questionTypeValues = [
-    "choice",
-    "true-false",
-    "fill-in",
-    "long-fill-in",
-    "matching",
-    "sequencing",
-    "numeric",
-    "likert",
-    "performance",
-] as const;
-
-const localizedString = z.record(
-    z.string(), // language code (en, fr, ar…)
-    z.string().min(1)
-);
+const localizedString = z
+    .record(z.string(), z.string().min(1))
+    .describe("Object keyed by language code, e.g. {\"en\": \"Hello\"}");
 
 const questionInput = z.object({
-    type: z.enum(questionTypeValues),
-
-    // translated question
-    text: localizedString.describe("Translated question text"),
-
-    // optional hint
-    subText: localizedString
-        .optional()
-        .describe("Translated hint or subtitle"),
-
-    // optional media
-    media: z.string().optional().describe("Optional media URL"),
-
-    // options translated per language
+    type: z
+        .enum(["single-choice", "multiple-choice", "true-false"])
+        .describe(
+            "single-choice: exactly 1 correct. multiple-choice: 1+ correct. true-false: exactly 2 options [trueLabel, falseLabel], 1 correct."
+        ),
+    text: localizedString.describe("Question text"),
+    subText: localizedString.optional().describe("Optional hint"),
     options: z
         .array(localizedString)
         .min(2)
-        .describe("Translated answer option labels"),
-
-    // correct answers
+        .describe(
+            "Answer options. For true-false: exactly 2 items [trueLabel, falseLabel]."
+        ),
     correctOptionIndexes: z
         .array(z.number().int().min(0))
         .min(1)
-        .describe("Zero-based indexes of correct options"),
+        .describe(
+            "Zero-based indexes of correct options. single-choice & true-false: exactly 1. multiple-choice: 1 or more."
+        ),
 });
+
+export type QuestionInput = z.infer<typeof questionInput>;
 
 
 export const generateQuiz = tool({
     description:
-        "Save generated quiz questions as draft for this conversation. Only generate in user language unless asked otherwise.",
+        "Save quiz questions as draft. All text fields use LocalizedString {langCode: value}. Generate in user's language only unless asked otherwise.",
 
     inputSchema: z.object({
         conversationId: z.number().int().positive(),

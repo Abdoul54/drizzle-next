@@ -1,6 +1,7 @@
 // components/conversation-chat.tsx
 'use client';
 
+import { QuestionSelection } from '@/app/(protected)/conversations/[id]/page';
 import {
     Attachment,
     AttachmentData,
@@ -25,6 +26,8 @@ interface ConversationChatProps {
     messages: UIMessage[];
     status: ChatStatus;
     onSubmit: (message: PromptInputMessage) => void;
+    selectedItem: QuestionSelection
+    removeSelection: () => void
     onStop: () => void;
     placeholder?: string;
 }
@@ -100,6 +103,8 @@ export function ConversationChat({
     messages,
     status,
     onSubmit,
+    selectedItem,
+    removeSelection,
     onStop,
     placeholder = "Type your message..."
 }: ConversationChatProps) {
@@ -179,6 +184,8 @@ export function ConversationChat({
                     onSubmit={onSubmit}
                     onStop={onStop}
                     status={status}
+                    selectedItem={selectedItem}
+                    removeSelection={removeSelection}
                     placeholder={placeholder}
                 />
             </div>

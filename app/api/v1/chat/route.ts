@@ -1,5 +1,4 @@
-// app/api/v1/chat/route.improved.ts
-// This is an improved version with all enhancements applied
+// app/api/v1/chat/route.ts
 
 import { getCurrentUser } from "@/lib/auth-session";
 import { openai } from "@ai-sdk/openai";
@@ -13,7 +12,7 @@ import {
     parseId,
 } from "@/lib/chat-persistence";
 import { generateQuiz } from "@/lib/tools";
-import { languageCodes } from "@/utils/languages";
+import { buildSystemPrompt } from "@/lib/system-prompt";
 import { chatRateLimiter, withRateLimit } from "@/lib/rate-limit";
 import { truncateToTokenBudget } from "@/lib/token-budget";
 import { conversation } from "@/db/schema";
@@ -22,18 +21,17 @@ import { eq } from "drizzle-orm";
 
 export const maxDuration = 30;
 
-// Error types for better error handling
 class RateLimitError extends Error {
     constructor(message: string, public headers: Record<string, string>) {
         super(message);
-        this.name = 'RateLimitError';
+        this.name = "RateLimitError";
     }
 }
 
 class ValidationError extends Error {
     constructor(message: string) {
         super(message);
-        this.name = 'ValidationError';
+        this.name = "ValidationError";
     }
 }
 
@@ -75,11 +73,19 @@ export async function POST(req: Request) {
 
         // 5. PROCESS MESSAGES (file extraction)
         const processedMessages = await convertTextFilesToContent(messages);
+        const selection = [...messages].reverse().find(m => m.role === 'user')?.metadata?.selection || null;
+        console.log(selection);
+
+
         const queryText = extractQueryText(processedMessages);
 
         // 6. BUILD RAG CONTEXT WITH TOKEN BUDGET
         let contextBlock = "No user query available.";
-        let ragMetadata = { truncated: false, originalTokens: 0, allocatedTokens: 0 };
+        let ragMetadata = {
+            truncated: false,
+            originalTokens: 0,
+            allocatedTokens: 0,
+        };
 
         if (queryText) {
             const { context: rawContext } = await buildRagContext({
@@ -88,7 +94,6 @@ export async function POST(req: Request) {
                 conversationId: convId,
             });
 
-            // Apply token budget (max 4000 tokens for RAG context)
             const {
                 text: truncatedContext,
                 originalTokens,
@@ -103,11 +108,14 @@ export async function POST(req: Request) {
                 allocatedTokens: truncatedTokens,
             };
 
-            // Log if context was truncated
             if (wasTruncated) {
-                console.warn(`RAG context truncated: ${originalTokens} → ${truncatedTokens} tokens`);
+                console.warn(
+                    `RAG context truncated: ${originalTokens} → ${truncatedTokens} tokens`
+                );
             }
         }
+
+        // 7. LOAD CURRENT DRAFT
         let currentDraft = null;
         if (convId) {
             const [conv] = await db
@@ -120,159 +128,36 @@ export async function POST(req: Request) {
 
         const assistantMessageId = generateId();
 
-        // 7. STREAM WITH ERROR BOUNDARIES
+        // 8. STREAM
         const result = streamText({
             model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
-            system: `You are a professional AI quiz generator.
-
-========================
-USER INFORMATION
-========================
-- User name: ${user?.name}
-- User ID: ${user?.id}
-- User speaks: English
-- Quiz id: ${quizId || 'N/A'}
-- Conversation id: ${conversationId || 'N/A'}
-- Supported languages: ${languageCodes.join(", ")}
-
-========================
-CONTEXT FROM DOCUMENTS
-========================
-${contextBlock}
-
-${ragMetadata.truncated ? `⚠️ Context was truncated from ${ragMetadata.originalTokens} to ${ragMetadata.allocatedTokens} tokens` : ''}
-
-This context comes from files the user uploaded to this quiz.
-If the user asks about documents, PDFs, or content:
-- Use ONLY this context
-- Be precise
-- Reference key facts from it
-${ragMetadata.truncated ? '- Note: Some content may be truncated due to length' : ''}
-
-========================
-QUIZ GENERATION BEHAVIOR
-========================
-You generate quizzes and save them using a tool.
-
-When the user asks to:
-- create quiz
-- generate questions
-- make exam
-- make test
-- add questions
-
-You MUST call the generateQuiz tool.
-
-NEVER output quiz questions in assistant text.
-ALWAYS use the tool.
-
-The quiz should:
-- match user request
-- be clear and well written
-- have correct answers
-- be logically structured
-
-========================
-LANGUAGE RULES (CRITICAL)
-========================
-Generate quiz ONLY in the language the user is speaking.
-
-Default:
-- If user speaks English → generate ONLY English keys
-- Do NOT include other languages unless asked
-
-When user asks to ADD a language (e.g. "add french", "translate to arabic"):
-- You MUST KEEP all existing language keys
-- ADD the new language key to every text and option
-- Do NOT remove or replace existing languages
-- Example: if draft has {"en": "..."}, adding french → {"en": "...", "fr": "..."}
-
-When user asks to REMOVE a language:
-- Remove only that language key
-- Keep all other languages
-
-If user explicitly asks:
-"add french"
-"make arabic version"
-"add multiple languages"
-
-THEN include those languages.
-
-Otherwise → ONE language only.
-
-========================
-TOOL FORMAT (VERY IMPORTANT)
-========================
-When calling generateQuiz tool you MUST use this exact structure:
-
-{
-  "conversationId": number,
-  "questions": [
-    {
-      "type": "choice",
-      "text": { "en": "Question text here" },
-      "subText": { "en": "Optional hint here" },
-      "options": [
-        { "en": "Option 1" },
-        { "en": "Option 2" },
-        { "en": "Option 3" },
-        { "en": "Option 4" }
-      ],
-      "correctOptionIndexes": [0]
-    }
-  ]
-}
-
-STRICT RULES:
-- NEVER use field "question"
-- ALWAYS use "text"
-- text MUST be an object with language keys
-- options MUST be array of objects with language keys
-- Even for ONE language → still object format
-- correctOptionIndexes must match correct answers
-- NEVER output quiz in assistant text
-- ALWAYS call generateQuiz tool
-
-========================
-GENERAL BEHAVIOR
-========================
-Be intelligent and helpful.
-Be concise.
-Do not explain tool usage to the user.
-Just call the tool when quiz generation is requested.
-
-========================
-CURRENT DRAFT
-========================
-${currentDraft
-                    ? JSON.stringify(currentDraft, null, 2)
-                    : 'No draft yet.'}
-
-When modifying the quiz (adding languages, editing, etc.):
-- Use the current draft above as your base
-- Preserve ALL existing content unless asked to change it
-`,
+            system: buildSystemPrompt({
+                userName: user.name,
+                userId: user.id,
+                quizId: quizId || null,
+                conversationId: conversationId || null,
+                selection,
+                contextBlock,
+                ragMetadata,
+                currentDraft,
+            }),
             messages: await convertToModelMessages(processedMessages),
             tools: {
                 generateQuiz,
             },
-            // Multi-step tool execution with step limit
             stopWhen: stepCountIs(10),
+            maxOutputTokens: 10000,
+            maxRetries: 2,
 
-            // Error handling callback
             onError: async ({ error }) => {
-                console.error('[Chat Stream Error]', {
-                    error: error,
+                console.error("[Chat Stream Error]", {
+                    error,
                     userId: user.id,
                     conversationId: convId,
                     timestamp: new Date().toISOString(),
                 });
-
-                // You can add additional error tracking here
-                // e.g., send to error monitoring service like Sentry
             },
 
-            // Save on successful completion
             onFinish: async ({ text, steps, totalUsage }) => {
                 if (!convId) return;
 
@@ -281,51 +166,47 @@ When modifying the quiz (adding languages, editing, etc.):
                         id: assistantMessageId,
                         conversationId: convId,
                         text,
-                        // steps,
                     });
 
-                    console.log('[Chat Complete]', {
-                        userId: user.id,
-                        conversationId: convId,
-                        messageLength: text.length,
-                        stepCount: steps.length,
-                        usage: totalUsage,
-                        timestamp: new Date().toISOString(),
-                    });
+                    // console.log("[Chat Complete]", {
+                    //     userId: user.id,
+                    //     conversationId: convId,
+                    //     messageLength: text.length,
+                    //     stepCount: steps.length,
+                    //     usage: totalUsage,
+                    //     timestamp: new Date().toISOString(),
+                    // });
                 } catch (error) {
-                    console.error('[Save Message Error]', {
-                        error: error instanceof Error ? error.message : 'Unknown error',
+                    console.error("[Save Message Error]", {
+                        error:
+                            error instanceof Error
+                                ? error.message
+                                : "Unknown error",
                         userId: user.id,
                         conversationId: convId,
                     });
-
-                    // Don't throw - we don't want to break the stream
-                    // The message was already sent to the user
                 }
             },
         });
 
-        // Return streaming response
         return result.toUIMessageStreamResponse();
-
     } catch (error) {
-        console.error('[Chat API Error]', {
-            error: error instanceof Error ? error.message : 'Unknown error',
+        console.error("[Chat API Error]", {
+            error: error instanceof Error ? error.message : "Unknown error",
             stack: error instanceof Error ? error.stack : undefined,
             timestamp: new Date().toISOString(),
         });
 
-        // Handle specific error types
         if (error instanceof RateLimitError) {
             return new Response(
                 JSON.stringify({
                     error: error.message,
-                    code: 'RATE_LIMIT_EXCEEDED',
+                    code: "RATE_LIMIT_EXCEEDED",
                 }),
                 {
                     status: 429,
                     headers: {
-                        'Content-Type': 'application/json',
+                        "Content-Type": "application/json",
                         ...error.headers,
                     },
                 }
@@ -336,28 +217,30 @@ When modifying the quiz (adding languages, editing, etc.):
             return new Response(
                 JSON.stringify({
                     error: error.message,
-                    code: 'VALIDATION_ERROR',
+                    code: "VALIDATION_ERROR",
                 }),
                 {
                     status: 400,
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { "Content-Type": "application/json" },
                 }
             );
         }
 
-        // Generic error response
         return new Response(
             JSON.stringify({
-                error: error instanceof Error ? error.message : 'Internal server error',
-                code: 'INTERNAL_ERROR',
-                // Only include details in development
-                ...(process.env.NODE_ENV === 'development' && {
-                    details: error instanceof Error ? error.stack : undefined,
+                error:
+                    error instanceof Error
+                        ? error.message
+                        : "Internal server error",
+                code: "INTERNAL_ERROR",
+                ...(process.env.NODE_ENV === "development" && {
+                    details:
+                        error instanceof Error ? error.stack : undefined,
                 }),
             }),
             {
                 status: 500,
-                headers: { 'Content-Type': 'application/json' },
+                headers: { "Content-Type": "application/json" },
             }
         );
     }

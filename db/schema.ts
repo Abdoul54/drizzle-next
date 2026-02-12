@@ -24,17 +24,10 @@ export const quizStatusEnum = pgEnum("quiz_status", [
 ]);
 
 export const questionTypeEnum = pgEnum("question_type", [
-    "choice",
+    "single-choice",
+    "multiple-choice",
     "true-false",
-    "fill-in",
-    "long-fill-in",
-    "matching",
-    "sequencing",
-    "numeric",
-    "likert",
-    "performance",
 ]);
-
 
 
 // =============================================
@@ -47,6 +40,7 @@ export const user = pgTable("user", {
     email: text("email").notNull().unique(),
     emailVerified: boolean("email_verified").notNull().default(false),
     image: text("image"),
+    language: text("language").default("en"),
     createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { precision: 0 })
         .notNull()
@@ -121,8 +115,8 @@ export const verification = pgTable(
 
 export const quiz = pgTable("quiz", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    title: varchar("title", { length: 255 }).notNull(),
-    description: varchar("description", { length: 255 }).notNull(),
+    title: jsonb("title").notNull().$type<Record<string, string>>(),
+    description: jsonb("description").$type<Record<string, string>>(),
     data: jsonb("data"),
     status: quizStatusEnum("status").notNull().default("draft"),
     createdBy: text("created_by")
@@ -142,8 +136,8 @@ export const question = pgTable("question", {
         .references(() => quiz.id, { onDelete: "cascade" }),
     type: questionTypeEnum("type").notNull(),
     media: varchar("media", { length: 255 }),
-    text: varchar("text", { length: 255 }).notNull(),
-    subText: varchar("sub_text", { length: 255 }),
+    text: jsonb("text").notNull().$type<Record<string, string>>(),
+    subText: jsonb("sub_text").$type<Record<string, string>>(),
 });
 
 export const option = pgTable("option", {
@@ -151,9 +145,10 @@ export const option = pgTable("option", {
     questionId: bigint("question_id", { mode: "number" })
         .notNull()
         .references(() => question.id, { onDelete: "cascade" }),
-    label: varchar("label", { length: 255 }).notNull(),
+    label: jsonb("label").notNull().$type<Record<string, string>>(),
 });
 
+// answer table stays the same — it references option.id (integer FK)
 export const answer = pgTable("answer", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     questionId: bigint("question_id", { mode: "number" })

@@ -1,61 +1,43 @@
 "use client";
+import { useEffect, useState } from "react";
 
-import {
-    Agent,
-    AgentContent,
-    AgentHeader,
-    AgentInstructions,
-    AgentOutput,
-    AgentTool,
-    AgentTools,
-} from "@/components/ai-elements/agent";
-import { z } from "zod";
+const Page = () => {
+    const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+    const [isHovering, setIsHovering] = useState(false);
 
-const webSearchTool = {
-    description: "Search the web for information",
-    inputSchema: z.object({
-        query: z.string().describe("The search query"),
-    }),
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+        };
+        window.addEventListener('mousemove', handleMouseMove);
+        return () => window.removeEventListener('mousemove', handleMouseMove);
+    }, []);
+
+    return (
+        <div className="flex justify-center items-center flex-1 bg-accent">
+            {isHovering && (
+                <div
+                    className="fixed pointer-events-none z-50"
+                    style={{
+                        left: mousePos.x,
+                        top: mousePos.y,
+                        transform: 'translate(-50%, -50%)'
+                    }}
+                >
+                    <img src="/pointer.png" alt="" width={32} height={32} />
+                </div>
+            )}
+
+            <div
+                className="cursor-none"
+                onMouseEnter={() => setIsHovering(true)}
+                onMouseLeave={() => setIsHovering(false)}
+                style={{ width: '200px', height: '200px', background: 'red' }}
+            >
+                Hover here
+            </div>
+        </div>
+    );
 };
 
-const readUrlTool = {
-    description: "Read and parse a URL",
-    inputSchema: z.object({
-        url: z.string().url().describe("The URL to read"),
-    }),
-};
-
-const summarizeTool = {
-    description: "Summarize text into key points",
-    inputSchema: z.object({
-        text: z.string().describe("The text to summarize"),
-        maxPoints: z.number().optional().describe("Maximum number of key points"),
-    }),
-};
-
-const outputSchema = `z.object({
-  sentiment: z.enum(['positive', 'negative', 'neutral']),
-  score: z.number(),
-  summary: z.string(),
-})`;
-
-const Example = () => (
-    <Agent>
-        <AgentHeader model="openai/gpt-5.2-pro" name="Research Assistant" />
-        <AgentContent>
-            <AgentInstructions>
-                You are a helpful research assistant. Your job is to search the web for
-                information and summarize findings for the user. Always cite your
-                sources and provide accurate, up-to-date information.
-            </AgentInstructions>
-            <AgentTools type="multiple">
-                <AgentTool tool={webSearchTool} value="web_search" />
-                <AgentTool tool={readUrlTool} value="read_url" />
-                <AgentTool tool={summarizeTool} value="summarize" />
-            </AgentTools>
-            <AgentOutput schema={outputSchema} />
-        </AgentContent>
-    </Agent>
-);
-
-export default Example;
+export default Page;

@@ -12,11 +12,19 @@ export const auth = betterAuth({
     }),
     emailAndPassword: {
         enabled: true,
-        async sendResetPassword(data, request) {
-            // Send an email to the user with a link to reset their password
-        },
         plugins: [
             nextCookies(),
         ]
-    }
+    },
+    user: {
+        additionalFields: {
+            language: {
+                type: 'string',
+                required: false,
+                defaultValue: 'en'
+            }
+        }
+    },
 });
+
+type Session = typeof auth.$Infer.Session

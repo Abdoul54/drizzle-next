@@ -1,38 +1,58 @@
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "../ui/radio-group"
+"use client";
 
-type Props = {
-    question: string
-    options: string[]
-    value?: string
-    onChange: (v: string) => void
+import { Checkbox } from "../ui/checkbox";
+import { Label } from "../ui/label";
+import { Question } from "@/types";
+
+interface Props {
+    question: Question;
+    language: string;
+    value: number[];
+    onChange: (v: number[]) => void;
+    qIndex: number;
 }
 
 export function MultipleChoice({
     question,
-    options,
-    value,
+    language,
+    value = [],
     onChange,
+    qIndex,
 }: Props) {
-    return (
-        <div className="space-y-3">
-            <p className="font-medium">{question}</p>
+    const toggle = (index: number) => {
+        if (value.includes(index)) {
+            onChange(value.filter((i) => i !== index));
+        } else {
+            onChange([...value, index]);
+        }
+    };
 
-            <RadioGroup
-                value={value}
-                onValueChange={onChange}
-                className="space-y-2"
-            >
-                {options.map((opt) => (
+    return (
+        <div className="space-y-2">
+            {question?.options?.map((opt, i) => {
+                const checked = value.includes(i);
+
+                return (
                     <Label
-                        key={opt}
-                        className="flex cursor-pointer items-center gap-3 rounded-md border p-3 hover:bg-muted"
+                        key={i}
+                        htmlFor={`q${qIndex}-${i}`}
+                        className="
+              flex items-center gap-3 rounded-xl border
+              border-border/60 bg-background
+              px-4 py-3 cursor-pointer
+              hover:bg-accent/60 hover:border-primary/40
+              transition-all
+            "
                     >
-                        <RadioGroupItem value={opt} />
-                        {opt}
+                        <Checkbox
+                            checked={checked}
+                            onCheckedChange={() => toggle(i)}
+                            id={`q${qIndex}-${i}`}
+                        />
+                        <span className="text-sm">{opt[language]}</span>
                     </Label>
-                ))}
-            </RadioGroup>
+                );
+            })}
         </div>
-    )
+    );
 }

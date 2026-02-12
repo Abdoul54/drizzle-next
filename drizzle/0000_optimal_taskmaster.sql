@@ -1,4 +1,4 @@
-CREATE TYPE "public"."question_type" AS ENUM('choice', 'true-false', 'fill-in', 'long-fill-in', 'matching', 'sequencing', 'numeric', 'likert', 'performance');--> statement-breakpoint
+CREATE TYPE "public"."question_type" AS ENUM('single-choice', 'multiple-choice', 'true-false');--> statement-breakpoint
 CREATE TYPE "public"."quiz_status" AS ENUM('draft', 'published', 'unpublished');--> statement-breakpoint
 CREATE TABLE "account" (
 	"id" text PRIMARY KEY NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE "message" (
 CREATE TABLE "option" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"question_id" bigint NOT NULL,
-	"label" varchar(255) NOT NULL
+	"label" jsonb NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "question" (
@@ -66,14 +66,14 @@ CREATE TABLE "question" (
 	"quiz_id" bigint NOT NULL,
 	"type" "question_type" NOT NULL,
 	"media" varchar(255),
-	"text" varchar(255) NOT NULL,
-	"sub_text" varchar(255)
+	"text" jsonb NOT NULL,
+	"sub_text" jsonb
 );
 --> statement-breakpoint
 CREATE TABLE "quiz" (
 	"id" bigserial PRIMARY KEY NOT NULL,
-	"title" varchar(255) NOT NULL,
-	"description" varchar(255) NOT NULL,
+	"title" jsonb NOT NULL,
+	"description" jsonb,
 	"data" jsonb,
 	"status" "quiz_status" DEFAULT 'draft' NOT NULL,
 	"created_by" text NOT NULL,
@@ -99,6 +99,7 @@ CREATE TABLE "user" (
 	"email" text NOT NULL,
 	"email_verified" boolean DEFAULT false NOT NULL,
 	"image" text,
+	"language" text DEFAULT 'en',
 	"created_at" timestamp (0) DEFAULT now() NOT NULL,
 	"updated_at" timestamp (0) DEFAULT now() NOT NULL,
 	CONSTRAINT "user_email_unique" UNIQUE("email")

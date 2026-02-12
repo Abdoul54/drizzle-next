@@ -12,7 +12,7 @@ interface Props {
     qIndex: number;
 }
 
-export function TrueFalse({
+export function SingleChoice({
     question,
     language,
     value,

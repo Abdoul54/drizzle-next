@@ -13,10 +13,13 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { QuizStatuses } from "@/enums"
 import { useCreateConversation, useGetConversations } from "@/hooks/queries/use-conversation"
 import { useGetQuiz, useUpdateQuiz } from "@/hooks/queries/use-quiz"
+import { t } from "@/lib/localized"
 import { Conversation } from "@/types"
 import { EllipsisVertical, MessageSquare, Plus, Trash2 } from "lucide-react"
 import { useParams, useRouter } from "next/navigation"
 import { useState } from "react"
+
+const LOCALE = "en"
 
 const Page = () => {
     const { id } = useParams()
@@ -45,16 +48,13 @@ const Page = () => {
         setSending(true)
         try {
             // Convert FileUIPart objects to File array
-            // FileUIPart has: { url: string (blob URL or data URL), mediaType: string, filename: string }
             const files: File[] = [];
 
             if (message.files && message.files.length > 0) {
                 for (const filePart of message.files) {
                     if (filePart.url) {
-                        // Fetch the blob from the blob URL
                         const response = await fetch(filePart.url);
                         const blob = await response.blob();
-                        // Create a File object from the blob
                         const file = new File([blob], filePart.filename || 'file', {
                             type: filePart.mediaType || blob.type,
                         });
@@ -63,13 +63,11 @@ const Page = () => {
                 }
             }
 
-            // Create conversation with initial message and files
             const newConversation = await createConversation.mutateAsync({
                 text: message.text || undefined,
                 files: files.length > 0 ? files : undefined,
             })
 
-            // Redirect to conversation page (no need to pass message in URL anymore)
             router.push(`/conversations/${newConversation.id}?new=true`)
         } catch (err) {
             console.error('Failed to create conversation:', err)
@@ -78,7 +76,6 @@ const Page = () => {
         }
     }
 
-    // Handle status change
     const handlePublish = () => {
         updateQuiz.mutate({ status: 'published' })
     }
@@ -87,7 +84,6 @@ const Page = () => {
         updateQuiz.mutate({ status: 'unpublished' })
     }
 
-    // Error state
     if (error) {
         return (
             <div className="flex flex-col justify-center items-center h-full p-8">
@@ -111,7 +107,7 @@ const Page = () => {
                 {!isLoading ? (
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold">{quiz?.title}</h1>
+                            <h1 className="text-2xl font-bold">{t(quiz?.title, LOCALE)}</h1>
                             {status && IconComponent && (
                                 <Badge variant={variant}>
                                     <IconComponent className="mr-1 h-3 w-3" />
@@ -157,14 +153,12 @@ const Page = () => {
 
                 {/* Description */}
                 {quiz?.description && (
-                    <p className="text-muted-foreground mb-6">{quiz.description}</p>
+                    <p className="text-muted-foreground mb-6">{t(quiz.description, LOCALE)}</p>
                 )}
 
                 {/* Main Content */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Chat Input & Conversations */}
                     <div className="lg:col-span-2 space-y-4">
-                        {/* Start Conversation Card */}
                         <Card>
                             <CardHeader>
                                 <CardTitle className="text-lg">
@@ -184,7 +178,6 @@ const Page = () => {
                             </CardContent>
                         </Card>
 
-                        {/* Existing Conversations */}
                         {conversations && conversations.length > 0 && (
                             <Card>
                                 <CardHeader>
@@ -212,7 +205,6 @@ const Page = () => {
                         )}
                     </div>
 
-                    {/* Sidebar */}
                     <div className="space-y-4">
                         <Card>
                             <CardHeader>

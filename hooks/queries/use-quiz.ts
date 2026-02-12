@@ -45,8 +45,8 @@ const useGetQuiz = (id?: number | string) => {
 ======================= */
 
 type CreateQuizInput = {
-    title: string;
-    description?: string;
+    title: Record<string, string>;
+    description?: Record<string, string>;
     status?: "draft" | "published" | "unpublished";
 };
 

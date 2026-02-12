@@ -1,17 +1,23 @@
-// schemas/create-quiz.schema.ts
+// schemas/quiz.schema.ts
 import { z } from "zod";
 
+/** At least one language key with a non-empty value */
+export const localizedStringSchema = z
+    .record(z.string(), z.string().min(1))
+    .refine((obj) => Object.keys(obj).length > 0, {
+        message: "At least one language is required",
+    });
+
 export const createQuizSchema = z.object({
-    title: z.string().min(1, "Title is required"),
-    description: z.string().max(225).min(1, "Description is required"),
+    title: localizedStringSchema,
+    description: localizedStringSchema.optional(),
 });
 
 export type CreateQuizForm = z.infer<typeof createQuizSchema>;
 
-
 export const updateQuizSchema = z.object({
-    title: z.string().min(1).optional(),
-    description: z.string().max(225).nullable().optional(),
+    title: localizedStringSchema.optional(),
+    description: localizedStringSchema.nullable().optional(),
     status: z.enum(["draft", "published", "unpublished"]).optional(),
 });
 
