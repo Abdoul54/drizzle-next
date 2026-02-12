@@ -8,9 +8,10 @@ import ChatSkeleton from '@/components/chat-skeleton';
 import { ConversationChat } from '@/components/conversation-chat';
 import { ConversationPreview } from '@/components/conversation-preview';
 import { Button } from '@/components/ui/button';
-import { useGetConversation } from '@/hooks/queries/use-conversation';
+import { useGetConversation, useGetDraft } from '@/hooks/queries/use-conversation';
 import { t } from '@/lib/localized';
 import { useChat } from '@ai-sdk/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, UIMessage } from 'ai';
 import { ArrowLeft } from 'lucide-react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
@@ -33,6 +34,8 @@ export default function Page() {
     const { id } = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const queryClient = useQueryClient();
+
 
     // Track if we've triggered the initial AI response
     const hasTriggeredInitialResponse = useRef(false);
@@ -42,6 +45,7 @@ export default function Page() {
 
     // Fetch conversation with messages and quiz data
     const { data: conversation, error: conversationError, isLoading } = useGetConversation(id as string);
+
     const [selectedItem, setSelectedItem] = useState<QuestionSelection>(null);
 
 
@@ -50,6 +54,8 @@ export default function Page() {
     const quizData = conversation?.quiz;
     const initialMessages = conversation?.messages ?? [];
 
+    const { data: draftData } = useGetDraft(conversationId);
+    const draftQuestions = draftData?.draft?.questions ?? [];
 
     const renderText = () => {
         switch (selectedItem?.selection?.type) {
@@ -58,7 +64,7 @@ export default function Page() {
             case 'subtext':
                 return `User selected the hint of the question number ${selectedItem?.questionIndex + 1}`
             case 'option':
-                return `User selected option number ${selectedItem?.selection?.id + 1} of the question number ${selectedItem?.questionIndex + 1}`
+                return `User selected option number ${selectedItem?.selection?.id} of the question number ${selectedItem?.questionIndex + 1}`
             default:
                 return null
         }
@@ -98,6 +104,13 @@ export default function Page() {
             }
         }
     }, [isLoading, conversationError, conversationId, needsResponse, initialMessages.length, messages, regenerate, status, router, id]);
+
+    useEffect(() => {
+        if (status === 'ready' && conversationId) {
+            queryClient.invalidateQueries({ queryKey: ['draft', Number(conversationId)] });
+        }
+    }, [status, conversationId, queryClient]);
+
 
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
@@ -174,7 +187,7 @@ export default function Page() {
 
             {/* Preview Panel */}
             <div className="flex flex-1 flex-col">
-                <ConversationPreview questions={conversation?.draft?.questions} selectedItem={selectedItem} setSelectedItem={setSelectedItem} />
+                <ConversationPreview questions={draftQuestions} selectedItem={selectedItem} setSelectedItem={setSelectedItem} />
             </div>
         </div>
     );

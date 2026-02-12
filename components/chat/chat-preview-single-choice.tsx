@@ -11,6 +11,7 @@ import {
 import { Item, ItemMedia, ItemTitle } from "@/components/ui/item";
 import { CheckCircle2 } from "lucide-react";
 import clsx from "clsx";
+import { Direction } from "@/utils/languages";
 
 type Option = {
     id: number;
@@ -31,6 +32,7 @@ interface Props {
     enableSelection?: boolean;
     selectedItem?: SelectionValue;
     onSelection: (v: SelectionValue) => void;
+    dir: Direction
 }
 
 const ChatPreviewSingleChoice = ({
@@ -40,7 +42,8 @@ const ChatPreviewSingleChoice = ({
     options,
     enableSelection = false,
     selectedItem,
-    onSelection
+    onSelection,
+    dir
 }: Props) => {
 
     const handleSelection = (value: SelectionValue) => {
@@ -59,7 +62,7 @@ const ChatPreviewSingleChoice = ({
 
 
     return (
-        <Card className="max-w-xl w-full shadow-xl border-muted/40 rounded-2xl">
+        <Card className="max-w-xl w-full shadow-xl border-muted/40 rounded-2xl" dir={dir}>
             <CardHeader className="space-y-2 pb-2">
                 {/* Title */}
                 <CardTitle
@@ -73,7 +76,7 @@ const ChatPreviewSingleChoice = ({
                         "ring-2 ring-info bg-info/10 text-info"
                     )}
                 >
-                    {text}
+                    {text}sc
                 </CardTitle>
 
                 {/* Subtext */}

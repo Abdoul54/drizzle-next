@@ -3,7 +3,7 @@ import { t } from "@/lib/localized";
 import ChatPreviewMultipleChoice from "./chat/chat-preview-multiple-choice";
 import { QuestionInput } from "@/lib/tools";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { languages } from "@/utils/languages";
+import { Direction, languages } from "@/utils/languages";
 import { useState } from "react";
 import { Button } from "./ui/button";
 import { ChevronLeft, ChevronRight, MousePointer2 } from "lucide-react";
@@ -23,6 +23,10 @@ export function ConversationPreview({
     const [language, setLanguage] = useState('en')
     const [currentQuestion, setCurrentQuestion] = useState(0)
     const [selectionEnabled, setSelectionEnabled] = useState(false)
+
+    const getDirection = () => {
+        return languages?.find(lang => lang?.code === language)
+    }
 
     const questionRender = (question: QuestionInput) => {
         // Determine if this question is currently selected
@@ -48,6 +52,7 @@ export function ConversationPreview({
                                 selection
                             });
                         }}
+                        dir={getDirection()?.direction as Direction || 'ltr'}
                     />
                 )
 
@@ -56,9 +61,9 @@ export function ConversationPreview({
                     <ChatPreviewMultipleChoice
                         text={t(question.text, language)}
                         subtext={t(question?.subText || undefined, language)}
-                        answers={question?.correctOptionIndexes?.map(c => c + 1)}
+                        answers={question?.correctOptionIndexes?.map(c => c)}
                         options={question?.options?.map(
-                            (opt, idx) => ({ id: idx + 1, label: t(opt, language) })
+                            (opt, idx) => ({ id: idx, label: t(opt, language) })
                         )}
                         enableSelection={selectionEnabled}
                         selectedItem={currentSelection}  // ← Add this
@@ -68,6 +73,7 @@ export function ConversationPreview({
                                 selection
                             });
                         }}
+                        dir={getDirection()?.direction as Direction || 'ltr'}
                     />
                 )
 

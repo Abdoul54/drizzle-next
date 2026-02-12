@@ -114,3 +114,24 @@ export const useCreateConversation = (quizId: number | string) => {
         },
     });
 };
+
+
+/* =======================
+   GET DRAFT
+   Add this to hooks/queries/use-conversation.ts
+======================= */
+
+export const useGetDraft = (conversationId: number | string | undefined) => {
+    const normalizedId = conversationId ? Number(conversationId) : undefined;
+
+    return useQuery({
+        queryKey: ["draft", normalizedId],
+        queryFn: async () => {
+            const { data } = await axiosInstance.get(
+                `/api/v1/conversations/${normalizedId}/draft`
+            );
+            return data;
+        },
+        enabled: !!normalizedId,
+    });
+};
