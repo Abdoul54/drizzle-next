@@ -63,41 +63,50 @@ const ChatPreviewSingleChoice = ({
 
     return (
         <Card className="max-w-xl w-full shadow-xl border-muted/40 rounded-2xl" dir={dir}>
-            <CardHeader className="space-y-2 pb-2">
-                {/* Title */}
-                <CardTitle
-                    role="button"
-                    tabIndex={enableSelection ? 0 : -1}
-                    onClick={() => handleSelection({ type: "text" })}
-                    className={clsx(
-                        "text-xl font-semibold rounded px-2 py-1 transition-all",
-                        enableSelection && "hover:bg-muted/40",
-                        selectedItem?.type === "text" &&
-                        "ring-2 ring-info bg-info/10 text-info"
-                    )}
-                >
-                    {text}sc
-                </CardTitle>
+            <CardHeader className="space-y-2">
+                {/* <img
+                    src="https://media.premiumtimesng.com/wp-content/files/2018/11/uefa-champions-league-rebranding-2018-2021-7.jpg"
+                    alt={text}
+                    className="w-full h-64 object-cover rounded-xl"
+                /> */}
 
-                {/* Subtext */}
-                {subtext && (
-                    <CardDescription
+                <div className="space-y-1">
+
+                    {/* Title */}
+                    <CardTitle
                         role="button"
                         tabIndex={enableSelection ? 0 : -1}
-                        onClick={() => handleSelection({ type: "subtext" })}
+                        onClick={() => handleSelection({ type: "text" })}
                         className={clsx(
-                            "text-sm rounded px-2 py-1 transition-all",
-                            enableSelection && "hover:bg-muted/40",
-                            selectedItem?.type === "subtext" &&
+                            "text-xl font-semibold rounded px-2 py-1 transition-all",
+                            enableSelection && "hover:bg-info/15 hover:scale-[1.02]",
+                            selectedItem?.type === "text" &&
                             "ring-2 ring-info bg-info/10 text-info"
                         )}
                     >
-                        {subtext}
-                    </CardDescription>
-                )}
+                        {text}sc
+                    </CardTitle>
+
+                    {/* Subtext */}
+                    {subtext && (
+                        <CardDescription
+                            role="button"
+                            tabIndex={enableSelection ? 0 : -1}
+                            onClick={() => handleSelection({ type: "subtext" })}
+                            className={clsx(
+                                "text-sm rounded px-2 py-1 transition-all",
+                                enableSelection && "hover:bg-info/15 hover:scale-[1.02]",
+                                selectedItem?.type === "subtext" &&
+                                "ring-2 ring-info bg-info/10 text-info"
+                            )}
+                        >
+                            {subtext}
+                        </CardDescription>
+                    )}
+                </div>
             </CardHeader>
 
-            <CardContent className="flex flex-col gap-2 pt-2">
+            <CardContent className="flex flex-col gap-2">
                 {options.map((opt) => {
                     const isCorrect = answer === opt.id;
                     const isSelected =
