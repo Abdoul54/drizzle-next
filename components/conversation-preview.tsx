@@ -41,7 +41,7 @@ export function ConversationPreview({
                         text={t(question.text, language)}
                         subtext={t(question?.subText || undefined, language)}
                         options={question?.options?.map(
-                            (opt, idx) => ({ id: idx + 1, label: t(opt, language) })
+                            (opt, idx) => ({ id: idx, label: t(opt, language) })
                         )}
                         answer={question?.correctOptionIndexes?.[0] + 1}
                         enableSelection={selectionEnabled}

@@ -11,7 +11,7 @@ import {
     extractQueryText,
     parseId,
 } from "@/lib/chat-persistence";
-import { generateQuiz } from "@/lib/tools";
+import { generateQuiz, removeOption, removeQuestion } from "@/lib/tools";
 import { buildSystemPrompt } from "@/lib/system-prompt";
 import { chatRateLimiter, withRateLimit } from "@/lib/rate-limit";
 import { truncateToTokenBudget } from "@/lib/token-budget";
@@ -19,6 +19,7 @@ import { conversation } from "@/db/schema";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { mistral } from "@ai-sdk/mistral";
+import { openai } from "@ai-sdk/openai";
 
 export const maxDuration = 30;
 
@@ -74,8 +75,15 @@ export async function POST(req: Request) {
 
         // 5. PROCESS MESSAGES (file extraction)
         const processedMessages = await convertTextFilesToContent(messages);
-        const selection = [...messages].reverse().find(m => m.role === 'user')?.metadata?.selection || null;
-        console.log(selection);
+        let selectionObj = [...messages]
+            .reverse()
+            .find(m => m.role === 'user')?.metadata?.selection ?? null;
+
+        if (typeof selectionObj === "string") {
+            try { selectionObj = JSON.parse(selectionObj); } catch { }
+        }
+
+        console.log(selectionObj);
 
 
         const queryText = extractQueryText(processedMessages);
@@ -127,6 +135,9 @@ export async function POST(req: Request) {
             currentDraft = conv?.draft;
         }
 
+        console.log(currentDraft);
+
+
         const assistantMessageId = generateId();
 
         // 8. STREAM
@@ -138,7 +149,7 @@ export async function POST(req: Request) {
                 userId: user.id,
                 quizId: quizId || null,
                 conversationId: conversationId || null,
-                selection,
+                selection: selectionObj,
                 contextBlock,
                 ragMetadata,
                 currentDraft,
@@ -146,6 +157,8 @@ export async function POST(req: Request) {
             messages: await convertToModelMessages(processedMessages),
             tools: {
                 generateQuiz,
+                removeOption,
+                removeQuestion
             },
             stopWhen: stepCountIs(10),
             maxOutputTokens: 10000,
@@ -158,6 +171,11 @@ export async function POST(req: Request) {
                     conversationId: convId,
                     timestamp: new Date().toISOString(),
                 });
+            },
+
+            onStepFinish: async ({ toolCalls }) => {
+                console.log(toolCalls);
+
             },
 
             onFinish: async ({ text, steps, totalUsage }) => {

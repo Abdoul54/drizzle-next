@@ -99,6 +99,40 @@ const getFileParts = (parts: unknown[]) => {
     }) as Array<{ type: string; url: string; mediaType: string; filename: string }>;
 };
 
+type Selection = {
+    value: string;
+    target: "option" | "question-text" | "question-subtext";
+    optionIndex?: number;
+    questionIndex: number;
+};
+
+export const selectionText = (selection: Selection | null) => {
+    if (!selection) return "";
+
+    const qNum = selection.questionIndex + 1;
+
+    switch (selection.target) {
+        case "option": {
+            const optNum =
+                typeof selection.optionIndex === "number"
+                    ? selection.optionIndex + 1
+                    : "?";
+
+            return `Selected option ${optNum} ("${selection.value}") from question ${qNum}.`;
+        }
+
+        case "question-text":
+            return `Selected question ${qNum} text ("${selection.value}").`;
+
+        case "question-subtext":
+            return `Selected hint/subtext of question ${qNum} ("${selection.value}").`;
+
+        default:
+            return `Selected element from question ${qNum}.`;
+    }
+};
+
+
 export function ConversationChat({
     messages,
     status,
@@ -115,8 +149,10 @@ export function ConversationChat({
                     {messages.map((message) => {
                         const fileParts = getFileParts(message.parts as unknown[]);
                         const hasFiles = fileParts.length > 0;
-                        const metadata = message.metadata as { selection?: string } | undefined;
+                        const metadata = message.metadata as { selection?: Selection } | undefined;
                         const hasSelection = metadata?.selection;
+
+                        console.log(hasSelection)
 
                         return (
                             <div key={message.id}>
@@ -136,7 +172,7 @@ export function ConversationChat({
                                                     <SquareMousePointer className="size-4" />
                                                 </ItemMedia>
                                                 <ItemContent>
-                                                    <ItemTitle>{hasSelection}</ItemTitle>
+                                                    <ItemTitle>{selectionText(hasSelection)}</ItemTitle>
                                                 </ItemContent>
                                             </Item>
                                         </MessageContent>

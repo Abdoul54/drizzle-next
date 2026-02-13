@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 
 import {
@@ -16,7 +17,7 @@ import {
     PromptInputTools,
 } from '@/components/ai-elements/prompt-input';
 import { GlobeIcon, SquareMousePointer, X } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { PromptAttachmentsDisplay } from './prompt-attachments-display';
 import type { ChatStatus } from 'ai';
 import { QuestionSelection } from '@/app/(protected)/conversations/[id]/page';
@@ -53,20 +54,25 @@ export const ChatPromptInput = ({
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
             onSubmit(message);
             setInput('');
+            removeSelection();
         }
     };
-    const renderText = () => {
-        switch (selectedItem?.selection?.type) {
+
+    const selectionLabel = useMemo(() => {
+        if (!selectedItem?.selection?.type) return null;
+
+        switch (selectedItem.selection.type) {
             case 'text':
-                return `You selected the text of the question number ${selectedItem?.questionIndex + 1}`
+                return `Selected question ${selectedItem.questionIndex + 1} text.`;
             case 'subtext':
-                return `You selected the hint of the question number ${selectedItem?.questionIndex + 1}`
+                return `Selected hint of question ${selectedItem.questionIndex + 1}.`;
             case 'option':
-                return `You selected option number ${selectedItem?.selection?.id + 1} of the question number ${selectedItem?.questionIndex + 1}`
+                return `Selected option of question ${selectedItem.questionIndex + 1}.`;
             default:
-                return null
+                return null;
         }
-    }
+    }, [selectedItem]);
+
 
     return (
         <PromptInput
@@ -83,7 +89,7 @@ export const ChatPromptInput = ({
                             <SquareMousePointer className="size-5" />
                         </ItemMedia>
                         <ItemContent>
-                            <ItemTitle>{renderText()}</ItemTitle>
+                            <ItemTitle>{selectionLabel}</ItemTitle>
                         </ItemContent>
                         <ItemMedia>
                             <Button size="icon-xs" variant="outline" onClick={removeSelection} className='bg-transparent border-info hover:bg-info/50 hover:text-background '><X /></Button>
@@ -96,7 +102,11 @@ export const ChatPromptInput = ({
                 <PromptInputTextarea
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={placeholder || "What's on your mind today"}
+                    placeholder={
+                        selectedItem
+                            ? "Describe what to change for the selected element..."
+                            : placeholder || "Describe your quiz..."
+                    }
                 />
             </PromptInputBody>
             <PromptInputFooter>

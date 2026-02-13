@@ -57,25 +57,47 @@ export default function Page() {
     const { data: draftData } = useGetDraft(conversationId);
     const draftQuestions = draftData?.draft?.questions ?? [];
 
-    const renderText = () => {
-        switch (selectedItem?.selection?.type) {
+    const renderSelection = () => {
+        if (!selectedItem?.selection?.type) return null;
+
+        const qi = selectedItem.questionIndex;
+        const question = draftQuestions[qi];
+        if (!question) return null;
+
+        switch (selectedItem.selection.type) {
             case 'text':
-                return `User selected the text of the question number ${selectedItem?.questionIndex + 1}`
+                return {
+                    target: "question-text",
+                    questionIndex: qi,
+                    value: t(question.text, LOCALE),
+                };
             case 'subtext':
-                return `User selected the hint of the question number ${selectedItem?.questionIndex + 1}`
-            case 'option':
-                return `User selected option number ${selectedItem?.selection?.id} of the question number ${selectedItem?.questionIndex + 1}`
+                return {
+                    target: "question-subtext",
+                    questionIndex: qi,
+                    value: t(question.subText, LOCALE) || '',
+                };
+            case 'option': {
+                const optIndex = selectedItem.selection.id;
+                const opt = question.options?.[optIndex];
+                return {
+                    target: "option",
+                    questionIndex: qi,
+                    optionIndex: optIndex,
+                    value: opt ? t(opt, LOCALE) : '',
+                };
+            }
             default:
-                return null
+                return null;
         }
-    }
+    };
 
     // Setup AI chat with initial messages from DB
     const { messages, sendMessage, status, error, regenerate, stop } = useChat({
         id: conversationId?.toString(),
         transport: new DefaultChatTransport({
             api: '/api/v1/chat',
-            body: { conversationId, quizId, selection: renderText() },
+            body: { conversationId, quizId },
         }),
         // Pass initial messages - they already have the correct UIMessage format
         messages: (conversationError || isLoading) ? [] : initialMessages as unknown as UIMessage[],
@@ -111,10 +133,13 @@ export default function Page() {
         }
     }, [status, conversationId, queryClient]);
 
-
     const handleSubmit = (message: PromptInputMessage) => {
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
-            sendMessage({ text: message.text, files: message.files, metadata: { selection: renderText() } });
+            sendMessage({
+                text: message.text,
+                files: message.files,
+                metadata: { selection: renderSelection() },
+            });
         }
     };
 
@@ -146,7 +171,7 @@ export default function Page() {
             <div className="flex flex-1 flex-col">
                 <div className="flex flex-col h-[calc(100vh-6rem)]">
                     {/* Header */}
-                    <div className="flex items-center gap-4 px-4 py-3 border-b">
+                    <div className="flex items-center gap-4 py-1 border-b">
                         <Button variant="ghost" size="icon" onClick={handleBack}>
                             <ArrowLeft className="h-5 w-5" />
                         </Button>
