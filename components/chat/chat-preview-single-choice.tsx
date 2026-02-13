@@ -84,7 +84,7 @@ const ChatPreviewSingleChoice = ({
                             "ring-2 ring-info bg-info/10 text-info"
                         )}
                     >
-                        {text}sc
+                        {text}
                     </CardTitle>
 
                     {/* Subtext */}

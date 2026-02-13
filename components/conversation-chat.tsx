@@ -21,6 +21,8 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from '@/components/ai-e
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { ChatPromptInput } from '@/components/chat/chat-prompt-input';
 import { ChatStatus, UIMessage } from 'ai';
+import { Item, ItemContent, ItemMedia, ItemTitle } from './ui/item';
+import { SquareMousePointer } from 'lucide-react';
 
 interface ConversationChatProps {
     messages: UIMessage[];
@@ -35,8 +37,6 @@ interface ConversationChatProps {
 // Component to render file attachments in messages
 const MessageAttachments = ({ attachments }: { attachments: AttachmentData[] }) => {
     if (!attachments || attachments.length === 0) return null;
-
-    console.log({ attachments });
 
     return (
         <Attachments variant="inline">
@@ -115,6 +115,8 @@ export function ConversationChat({
                     {messages.map((message) => {
                         const fileParts = getFileParts(message.parts as unknown[]);
                         const hasFiles = fileParts.length > 0;
+                        const metadata = message.metadata as { selection?: string } | undefined;
+                        const hasSelection = metadata?.selection;
 
                         return (
                             <div key={message.id}>
@@ -123,6 +125,20 @@ export function ConversationChat({
                                     <Message from={message.role}>
                                         <MessageContent className='p-0 bg-transparent!'>
                                             <MessageAttachments attachments={fileParts as AttachmentData[]} />
+                                        </MessageContent>
+                                    </Message>
+                                )}
+                                {message.role === 'user' && hasSelection && (
+                                    <Message from={message.role}>
+                                        <MessageContent className='p-0 bg-transparent!'>
+                                            <Item variant="outline" size="sm" className='w-full bg-info/20 border-info text-info px-2 py-1'>
+                                                <ItemMedia>
+                                                    <SquareMousePointer className="size-4" />
+                                                </ItemMedia>
+                                                <ItemContent>
+                                                    <ItemTitle>{hasSelection}</ItemTitle>
+                                                </ItemContent>
+                                            </Item>
                                         </MessageContent>
                                     </Message>
                                 )}
