@@ -12,6 +12,7 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@ai-sdk/mistral": "^3.0.20",
     "@ai-sdk/openai": "^3.0.25",
     "@ai-sdk/react": "^3.0.59",
     "@aws-sdk/client-s3": "^3.978.0",

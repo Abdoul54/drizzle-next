@@ -1,7 +1,7 @@
 // app/api/v1/chat/route.ts
 
 import { getCurrentUser } from "@/lib/auth-session";
-import { openai } from "@ai-sdk/openai";
+// import { openai } from "@ai-sdk/openai";
 import { streamText, convertToModelMessages, generateId, stepCountIs } from "ai";
 import { buildRagContext } from "@/lib/rag";
 import { convertTextFilesToContent } from "@/lib/message-converter";
@@ -18,6 +18,7 @@ import { truncateToTokenBudget } from "@/lib/token-budget";
 import { conversation } from "@/db/schema";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
+import { mistral } from "@ai-sdk/mistral";
 
 export const maxDuration = 30;
 
@@ -130,7 +131,8 @@ export async function POST(req: Request) {
 
         // 8. STREAM
         const result = streamText({
-            model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+            // model: openai(process.env.OPENAI_MODEL || "gpt-4o-mini"),
+            model: mistral(process.env.MISTRAL_MODEL || ""),
             system: buildSystemPrompt({
                 userName: user.name,
                 userId: user.id,
