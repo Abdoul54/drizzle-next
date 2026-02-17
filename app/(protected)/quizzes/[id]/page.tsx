@@ -107,7 +107,7 @@ const Page = () => {
                 {!isLoading ? (
                     <div className="flex items-center justify-between mb-6">
                         <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold">{t(quiz?.title, LOCALE)}</h1>
+                            <h1 className="text-2xl font-bold">{t(quiz?.activeVersion?.title, LOCALE)}</h1>
                             {status && IconComponent && (
                                 <Badge variant={variant}>
                                     <IconComponent className="mr-1 h-3 w-3" />
@@ -152,8 +152,8 @@ const Page = () => {
                 )}
 
                 {/* Description */}
-                {quiz?.description && (
-                    <p className="text-muted-foreground mb-6">{t(quiz.description, LOCALE)}</p>
+                {quiz?.activeVersion?.description && (
+                    <p className="text-muted-foreground mb-6">{t(quiz.activeVersion.description, LOCALE)}</p>
                 )}
 
                 {/* Main Content */}

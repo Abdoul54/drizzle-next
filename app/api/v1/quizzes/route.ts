@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { quiz, user } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { quiz, quizVersion, user } from "@/db/schema";
+import { desc, eq, and } from "drizzle-orm";
 import { createQuizSchema } from "@/schemas/quiz.schema";
 import { getCurrentUser } from "@/lib/auth-session";
 
@@ -19,9 +19,11 @@ export async function GET(req: Request) {
         const query = db
             .select({
                 id: quiz.id,
-                title: quiz.title,
-                description: quiz.description,
-                status: quiz.status,
+                title: quizVersion.title,
+                description: quizVersion.description,
+                status: quizVersion.status,
+                versionNumber: quizVersion.versionNumber,
+                activeVersionId: quiz.activeVersionId,
                 createdAt: quiz.createdAt,
                 createdBy: {
                     id: user.id,
@@ -31,10 +33,17 @@ export async function GET(req: Request) {
             })
             .from(quiz)
             .leftJoin(user, eq(quiz.createdBy, user.id))
+            .leftJoin(
+                quizVersion,
+                and(
+                    eq(quizVersion.quizId, quiz.id),
+                    eq(quizVersion.isActive, true)
+                )
+            )
             .orderBy(desc(quiz.createdAt));
 
         const quizzes = isQuizStatus(statusParam)
-            ? await query.where(eq(quiz.status, statusParam))
+            ? await query.where(eq(quizVersion.status, statusParam))
             : await query;
 
         return NextResponse.json(quizzes);
@@ -74,22 +83,57 @@ export async function POST(req: Request) {
 
         const { title, description } = parsed.data;
 
-        const [createdQuiz] = await db
-            .insert(quiz)
-            .values({
-                title,
-                createdBy: user.id,
-                description: description ?? null, // nullable column
-            })
-            .returning({
-                id: quiz.id,
-                title: quiz.title,
-                description: quiz.description,
-                status: quiz.status,
-                createdAt: quiz.createdAt,
-            });
+        // Create quiz and initial version in a transaction
+        const result = await db.transaction(async (tx) => {
+            // 1. Create the quiz
+            const [newQuiz] = await tx
+                .insert(quiz)
+                .values({
+                    createdBy: user.id,
+                })
+                .returning({
+                    id: quiz.id,
+                    createdAt: quiz.createdAt,
+                });
 
-        return NextResponse.json(createdQuiz, { status: 201 });
+            // 2. Create version 1
+            const [version] = await tx
+                .insert(quizVersion)
+                .values({
+                    quizId: newQuiz.id,
+                    versionNumber: 1,
+                    title,
+                    description: description ?? null,
+                    status: "draft",
+                    isActive: true,
+                    createdBy: user.id,
+                })
+                .returning({
+                    id: quizVersion.id,
+                    title: quizVersion.title,
+                    description: quizVersion.description,
+                    status: quizVersion.status,
+                    versionNumber: quizVersion.versionNumber,
+                });
+
+            // 3. Set as active version
+            await tx
+                .update(quiz)
+                .set({ activeVersionId: version.id })
+                .where(eq(quiz.id, newQuiz.id));
+
+            return {
+                id: newQuiz.id,
+                title: version.title,
+                description: version.description,
+                status: version.status,
+                versionNumber: version.versionNumber,
+                activeVersionId: version.id,
+                createdAt: newQuiz.createdAt,
+            };
+        });
+
+        return NextResponse.json(result, { status: 201 });
     } catch (error) {
         console.error(error);
         return NextResponse.json(

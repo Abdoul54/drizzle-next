@@ -212,7 +212,7 @@ export default function Page() {
 
             {/* Preview Panel */}
             <div className="flex flex-1 flex-col">
-                <ConversationPreview questions={draftQuestions} selectedItem={selectedItem} setSelectedItem={setSelectedItem} />
+                <ConversationPreview questions={draftQuestions} selectedItem={selectedItem} setSelectedItem={setSelectedItem} conversationId={conversationId} quizId={quizId} />
             </div>
         </div>
     );

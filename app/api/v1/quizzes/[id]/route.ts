@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { quiz } from "@/db/schema";
+import { quiz, quizVersion } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { getCurrentUser } from "@/lib/auth-session";
 import { updateQuizSchema } from "@/schemas/quiz.schema";
@@ -28,12 +28,35 @@ export async function GET(
     }
 
     const result = await db
-        .select()
+        .select({
+            id: quiz.id,
+            activeVersionId: quiz.activeVersionId,
+            createdAt: quiz.createdAt,
+            updatedAt: quiz.updatedAt,
+            activeVersion: {
+                id: quizVersion.id,
+                versionNumber: quizVersion.versionNumber,
+                title: quizVersion.title,
+                description: quizVersion.description,
+                status: quizVersion.status,
+                data: quizVersion.data,
+                isActive: quizVersion.isActive,
+                createdAt: quizVersion.createdAt,
+                updatedAt: quizVersion.updatedAt,
+            },
+        })
         .from(quiz)
+        .leftJoin(
+            quizVersion,
+            and(
+                eq(quizVersion.quizId, quiz.id),
+                eq(quizVersion.isActive, true)
+            )
+        )
         .where(and(eq(quiz.id, quizId), eq(quiz.createdBy, user.id)))
         .limit(1);
 
-    if (!result.length) {
+    if (!result.length || !result[0].activeVersion) {
         return NextResponse.json(
             { message: "Quiz not found" },
             { status: 404 }
@@ -46,6 +69,7 @@ export async function GET(
 
 /**
  * PATCH /api/v1/quizzes/[id]
+ * Updates the active version
  */
 export async function PATCH(
     req: Request,
@@ -86,17 +110,38 @@ export async function PATCH(
             : {}),
     };
 
+    // Find the active version for this quiz
+    const activeVersion = await db
+        .select({ id: quizVersion.id })
+        .from(quiz)
+        .leftJoin(
+            quizVersion,
+            and(
+                eq(quizVersion.quizId, quiz.id),
+                eq(quizVersion.isActive, true)
+            )
+        )
+        .where(and(eq(quiz.id, quizId), eq(quiz.createdBy, user.id)))
+        .limit(1);
+
+    if (!activeVersion.length || !activeVersion[0].id) {
+        return NextResponse.json(
+            { message: "Quiz not found" },
+            { status: 404 }
+        );
+    }
 
     const [updated] = await db
-        .update(quiz)
+        .update(quizVersion)
         .set(updateValues)
-        .where(and(eq(quiz.id, quizId), eq(quiz.createdBy, user.id)))
+        .where(eq(quizVersion.id, activeVersion[0].id))
         .returning({
-            id: quiz.id,
-            title: quiz.title,
-            description: quiz.description,
-            status: quiz.status,
-            updatedAt: quiz.updatedAt,
+            id: quizVersion.id,
+            versionNumber: quizVersion.versionNumber,
+            title: quizVersion.title,
+            description: quizVersion.description,
+            status: quizVersion.status,
+            updatedAt: quizVersion.updatedAt,
         });
 
     if (!updated) {
@@ -111,6 +156,7 @@ export async function PATCH(
 
 /**
  * DELETE /api/v1/quizzes/[id]
+ * Deletes the entire quiz (cascade deletes all versions)
  */
 export async function DELETE(
     _: Request,

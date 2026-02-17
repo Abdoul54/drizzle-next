@@ -1,4 +1,3 @@
-import { relations } from "drizzle-orm";
 import {
     pgTable,
     text,
@@ -115,10 +114,7 @@ export const verification = pgTable(
 
 export const quiz = pgTable("quiz", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
-    title: jsonb("title").notNull().$type<Record<string, string>>(),
-    description: jsonb("description").$type<Record<string, string>>(),
-    data: jsonb("data"),
-    status: quizStatusEnum("status").notNull().default("draft"),
+    activeVersionId: bigint("active_version_id", { mode: "number" }), // No FK reference
     createdBy: text("created_by")
         .notNull()
         .references(() => user.id, { onDelete: "cascade" }),
@@ -129,11 +125,35 @@ export const quiz = pgTable("quiz", {
         .$onUpdate(() => new Date()),
 });
 
-export const question = pgTable("question", {
+export const quizVersion = pgTable("quiz_version", {
     id: bigserial("id", { mode: "number" }).primaryKey(),
     quizId: bigint("quiz_id", { mode: "number" })
         .notNull()
         .references(() => quiz.id, { onDelete: "cascade" }),
+    versionNumber: integer("version_number").notNull(),
+    title: jsonb("title").notNull().$type<Record<string, string>>(),
+    description: jsonb("description").$type<Record<string, string>>(),
+    data: jsonb("data"),
+    status: quizStatusEnum("status").notNull().default("draft"),
+    isActive: boolean("is_active").notNull().default(false),
+    createdBy: text("created_by")
+        .notNull()
+        .references(() => user.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { precision: 0 }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { precision: 0 })
+        .notNull()
+        .defaultNow()
+        .$onUpdate(() => new Date()),
+}, (table) => [
+    index("quiz_version_quiz_id_index").on(table.quizId),
+    index("quiz_version_active_index").on(table.quizId, table.isActive),
+]);
+
+export const question = pgTable("question", {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    quizVersionId: bigint("quiz_version_id", { mode: "number" })
+        .notNull()
+        .references(() => quizVersion.id, { onDelete: "cascade" }),
     type: questionTypeEnum("type").notNull(),
     media: varchar("media", { length: 255 }),
     text: jsonb("text").notNull().$type<Record<string, string>>(),
@@ -225,97 +245,3 @@ export const attachment = pgTable(
     ]
 );
 
-// =============================================
-// RELATIONS
-// =============================================
-
-export const userRelations = relations(user, ({ many }) => ({
-    sessions: many(session),
-    accounts: many(account),
-    quizzes: many(quiz),
-    conversations: many(conversation),
-}));
-
-export const sessionRelations = relations(session, ({ one }) => ({
-    user: one(user, {
-        fields: [session.userId],
-        references: [user.id],
-    }),
-}));
-
-export const accountRelations = relations(account, ({ one }) => ({
-    user: one(user, {
-        fields: [account.userId],
-        references: [user.id],
-    }),
-}));
-
-export const quizRelations = relations(quiz, ({ one, many }) => ({
-    createdByUser: one(user, {
-        fields: [quiz.createdBy],
-        references: [user.id],
-    }),
-    questions: many(question),
-    conversations: many(conversation),
-    attachments: many(attachment),
-}));
-
-export const questionRelations = relations(question, ({ one, many }) => ({
-    quiz: one(quiz, {
-        fields: [question.quizId],
-        references: [quiz.id],
-    }),
-    options: many(option),
-    answers: many(answer),
-}));
-
-export const optionRelations = relations(option, ({ one, many }) => ({
-    question: one(question, {
-        fields: [option.questionId],
-        references: [question.id],
-    }),
-    answers: many(answer),
-}));
-
-export const answerRelations = relations(answer, ({ one }) => ({
-    question: one(question, {
-        fields: [answer.questionId],
-        references: [question.id],
-    }),
-    option: one(option, {
-        fields: [answer.value],
-        references: [option.id],
-    }),
-}));
-
-export const attachmentRelations = relations(attachment, ({ one }) => ({
-    quiz: one(quiz, {
-        fields: [attachment.quizId],
-        references: [quiz.id],
-    }),
-    conversation: one(conversation, {
-        fields: [attachment.conversationId],
-        references: [conversation.id],
-    }),
-}));
-
-export const conversationRelations = relations(conversation, ({ one, many }) => ({
-    user: one(user, {
-        fields: [conversation.userId],
-        references: [user.id],
-    }),
-    quiz: one(quiz, {
-        fields: [conversation.quizId],
-        references: [quiz.id],
-    }),
-    messages: many(message),
-    attachments: many(attachment),
-}));
-
-export const messageRelations = relations(message, ({ one, many }) => ({
-    conversation: one(conversation, {
-        fields: [message.conversationId],
-        references: [conversation.id],
-    }),
-    attachments: many(attachment),
-}));

@@ -31,8 +31,8 @@ const ACCEPTED_FILE_TYPES = 'application/pdf,application/x-pdf,application/acrob
 interface ChatPromptInputProps {
     onSubmit: (message: PromptInputMessage) => void;
     onStop?: () => void;
-    selectedItem: QuestionSelection
-    removeSelection: () => void
+    selectedItem?: QuestionSelection
+    removeSelection?: () => void
     placeholder?: string;
     status?: ChatStatus;
     className?: string;
@@ -54,7 +54,8 @@ export const ChatPromptInput = ({
         if (message.text?.trim() || (message.files && message.files.length > 0)) {
             onSubmit(message);
             setInput('');
-            removeSelection();
+            if (removeSelection)
+                removeSelection();
         }
     };
 

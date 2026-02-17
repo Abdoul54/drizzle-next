@@ -115,9 +115,32 @@ const useDeleteQuiz = () => {
     });
 };
 
+/* =======================
+    GET QUIZ TO PASS
+    ======================= */
+const useGetQuizInfo = (id?: number | string) => {
+    const normalizedId = id ? Number(id) : undefined;
+
+    return useQuery({
+        queryKey: ["quiz-to-pass", normalizedId],
+        queryFn: async () => {
+            const { data } = await axiosInstance.get(
+                `/api/v1/quiz/${normalizedId}`
+            );
+            return data;
+        },
+        enabled: !!normalizedId,
+    });
+};
+
+/* =======================
+GET QUISTION TO PASS
+======================= */
+
 export {
     useGetQuizzes,
     useGetQuiz,
+    useGetQuizInfo,
     useCreateQuiz,
     useUpdateQuiz,
     useDeleteQuiz,

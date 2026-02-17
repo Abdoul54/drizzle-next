@@ -6,23 +6,30 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Direction, languages } from "@/utils/languages";
 import { useState } from "react";
 import { Button } from "./ui/button";
-import { ChevronLeft, ChevronRight, MousePointer2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleCheck, LoaderCircle, MousePointer2 } from "lucide-react";
 import { CustomCursor } from "./custom-cursor";
 import { QuestionSelection } from "@/app/(protected)/conversations/[id]/page";
+import { useApproveDraft } from "@/hooks/queries/use-conversation";
 
 
 export function ConversationPreview({
     questions,
     selectedItem,
     setSelectedItem,
+    conversationId,
+    quizId
 }: {
     questions: QuestionInput[];
     selectedItem: QuestionSelection;
     setSelectedItem: React.Dispatch<React.SetStateAction<QuestionSelection>>;
+    conversationId: number | string;
+    quizId: number | string;
 }) {
     const [language, setLanguage] = useState('en')
     const [currentQuestion, setCurrentQuestion] = useState(0)
     const [selectionEnabled, setSelectionEnabled] = useState(false)
+
+    const approveDraft = useApproveDraft(conversationId);
 
     const getDirection = () => {
         return languages?.find(lang => lang?.code === language)
@@ -81,6 +88,24 @@ export function ConversationPreview({
                 return null
         }
     }
+
+    const handleApproveDraft = async () => {
+        try {
+            const result = await approveDraft.mutateAsync();
+            console.log("Version created:", result);
+            // result: {
+            //   success: true,
+            //   message: "Quiz version created successfully",
+            //   versionId: 123,
+            //   versionNumber: 2,
+            //   questionsCount: 3
+            // }
+        } catch (error) {
+            console.error("Failed to approve:", error);
+        }
+
+    }
+
     return (
         <div className="flex flex-col bg-accent">
             <div className="flex flex-row justify-between bg-background p-2">
@@ -133,6 +158,14 @@ export function ConversationPreview({
                     <Button size="icon" variant="outline" onClick={() => setCurrentQuestion(currentQuestion + 1)} disabled={currentQuestion === questions?.length - 1}>
                         <ChevronRight />
                     </Button>
+                    <Button
+                        onClick={handleApproveDraft}
+                        disabled={approveDraft.isPending}
+                    >
+                        {approveDraft.isPending ? <LoaderCircle className="animate-spin" /> : <CircleCheck />}
+                        {approveDraft.isPending ? "Approving..." : "Approve Draft"}
+                    </Button>
+
                 </div>
             </div>
             <CustomCursor

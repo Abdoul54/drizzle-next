@@ -135,3 +135,35 @@ export const useGetDraft = (conversationId: number | string | undefined) => {
         enabled: !!normalizedId,
     });
 };
+
+
+/* =======================
+   APPROVE DRAFT
+======================= */
+
+export const useApproveDraft = (conversationId: number | string) => {
+    const queryClient = useQueryClient();
+    const normalizedId = Number(conversationId);
+
+    return useMutation({
+        mutationFn: async () => {
+            const { data } = await axiosInstance.post(
+                `/api/v1/conversations/${normalizedId}/approve`
+            );
+            return data;
+        },
+        onSuccess: (data) => {
+            // Invalidate quiz-related queries to show the new version
+            if (data.quizId) {
+                queryClient.invalidateQueries({
+                    queryKey: ["quiz", data.quizId]
+                });
+                queryClient.invalidateQueries({
+                    queryKey: ["conversations", data.quizId]
+                });
+            }
+
+            // ✅ Draft stays in conversation - no need to invalidate conversation or draft queries
+        },
+    });
+};

@@ -63,7 +63,7 @@ CREATE TABLE "option" (
 --> statement-breakpoint
 CREATE TABLE "question" (
 	"id" bigserial PRIMARY KEY NOT NULL,
-	"quiz_id" bigint NOT NULL,
+	"quiz_version_id" bigint NOT NULL,
 	"type" "question_type" NOT NULL,
 	"media" varchar(255),
 	"text" jsonb NOT NULL,
@@ -72,10 +72,21 @@ CREATE TABLE "question" (
 --> statement-breakpoint
 CREATE TABLE "quiz" (
 	"id" bigserial PRIMARY KEY NOT NULL,
+	"active_version_id" bigint,
+	"created_by" text NOT NULL,
+	"created_at" timestamp (0) DEFAULT now() NOT NULL,
+	"updated_at" timestamp (0) DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "quiz_version" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"quiz_id" bigint NOT NULL,
+	"version_number" integer NOT NULL,
 	"title" jsonb NOT NULL,
 	"description" jsonb,
 	"data" jsonb,
 	"status" "quiz_status" DEFAULT 'draft' NOT NULL,
+	"is_active" boolean DEFAULT false NOT NULL,
 	"created_by" text NOT NULL,
 	"created_at" timestamp (0) DEFAULT now() NOT NULL,
 	"updated_at" timestamp (0) DEFAULT now() NOT NULL
@@ -124,12 +135,16 @@ ALTER TABLE "conversation" ADD CONSTRAINT "conversation_user_id_user_id_fk" FORE
 ALTER TABLE "conversation" ADD CONSTRAINT "conversation_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "message" ADD CONSTRAINT "message_conversation_id_conversation_id_fk" FOREIGN KEY ("conversation_id") REFERENCES "public"."conversation"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "option" ADD CONSTRAINT "option_question_id_question_id_fk" FOREIGN KEY ("question_id") REFERENCES "public"."question"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "question" ADD CONSTRAINT "question_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "question" ADD CONSTRAINT "question_quiz_version_id_quiz_version_id_fk" FOREIGN KEY ("quiz_version_id") REFERENCES "public"."quiz_version"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "quiz" ADD CONSTRAINT "quiz_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "quiz_version" ADD CONSTRAINT "quiz_version_quiz_id_quiz_id_fk" FOREIGN KEY ("quiz_id") REFERENCES "public"."quiz"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "quiz_version" ADD CONSTRAINT "quiz_version_created_by_user_id_fk" FOREIGN KEY ("created_by") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "session" ADD CONSTRAINT "session_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "account_user_id_index" ON "account" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "attachment_quiz_id_index" ON "attachment" USING btree ("quiz_id");--> statement-breakpoint
 CREATE INDEX "attachment_conversation_id_index" ON "attachment" USING btree ("conversation_id");--> statement-breakpoint
 CREATE INDEX "attachment_message_id_index" ON "attachment" USING btree ("message_id");--> statement-breakpoint
+CREATE INDEX "quiz_version_quiz_id_index" ON "quiz_version" USING btree ("quiz_id");--> statement-breakpoint
+CREATE INDEX "quiz_version_active_index" ON "quiz_version" USING btree ("quiz_id","is_active");--> statement-breakpoint
 CREATE INDEX "session_user_id_index" ON "session" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "verification_identifier_index" ON "verification" USING btree ("identifier");
